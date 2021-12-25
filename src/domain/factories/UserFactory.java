@@ -23,7 +23,14 @@ public class UserFactory {
     }
 
     private Validation<String, String> validateUsername(String username) {
-      return username == null ? Validation.invalid("username cannot be null") : Validation.valid(username);
+      var errorMessage = "";
+
+      if (username == null)
+        errorMessage = "username cannot be null";
+      else if (username == "")
+        errorMessage = "username cannot be empty";
+
+      return errorMessage != "" ? Validation.invalid(errorMessage) : Validation.valid(username);
     }
 
     private Validation<String, String> validatePassword(String password) {
@@ -41,16 +48,16 @@ public class UserFactory {
       var errorMessage = "";
 
       if (tags == null)
-        errorMessage = "list of tags cannot be null";
+        errorMessage = "tags list cannot be null";
       else if (tags.isEmpty())
-        errorMessage = "list of tags cannot be empty";
+        errorMessage = "tags list cannot be empty";
 
       var uniqueTags = tags;
       if (errorMessage == "") {
         uniqueTags = tags.stream().distinct().collect(Collectors.toList());
 
         if (uniqueTags.size() > 5)
-          errorMessage = "list of tags cannot contain more than 5 distinct elements";
+          errorMessage = "tags list cannot contain more than 5 distinct elements";
       }
 
       return errorMessage != "" ? Validation.invalid(errorMessage) : Validation.valid(uniqueTags);

@@ -1,6 +1,7 @@
 package http;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -146,5 +147,26 @@ public class HttpResponse {
     response += this.body;
 
     return response;
+  }
+
+  // getters
+  public String getStatusCode() {
+    return this.statusCode;
+  }
+
+  public String getReasonPhrase() {
+    return this.reasonPhrase;
+  }
+
+  public String getHTTPVersion() {
+    return this.HTTPVersion;
+  }
+
+  public Map<String, String> getHeaders() {
+    return Collections.unmodifiableMap(this.headers);
+  }
+
+  public String getBody() {
+    return this.body;
   }
 }

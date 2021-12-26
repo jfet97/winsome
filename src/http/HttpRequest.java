@@ -1,6 +1,7 @@
 package http;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -192,5 +193,26 @@ public class HttpRequest {
     request += this.body;
 
     return request;
+  }
+
+  // getters
+  public String getMethod() {
+    return this.method;
+  }
+
+  public String getRequestTarget() {
+    return this.requestTarget;
+  }
+
+  public String getHTTPVersion() {
+    return this.HTTPVersion;
+  }
+
+  public Map<String, String> getHeaders() {
+    return Collections.unmodifiableMap(this.headers);
+  }
+
+  public String getBody() {
+    return this.body;
   }
 }

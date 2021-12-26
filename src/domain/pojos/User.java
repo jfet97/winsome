@@ -18,9 +18,9 @@ public class User {
   public static User of(String username, String password, List<String> tags) {
     var newUser = new User();
 
-    newUser.username = username;
-    newUser.password = HashPassword.hash(password);
-    newUser.tags = tags; // needs manual synchronization
+    newUser.username = username; // readonly
+    newUser.password = HashPassword.hash(password); // readonly
+    newUser.tags = tags; // readonly
     newUser.posts = new ConcurrentHashMap<String, Post>();
     newUser.followers = new LinkedList<String>(); // needs manual synchronization
     newUser.following = new LinkedList<String>(); // needs manual synchronization

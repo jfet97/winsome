@@ -19,14 +19,14 @@ public class Post {
 
     var newPost = new Post();
 
-    newPost.uuid = UUID.randomUUID().toString();
-    newPost.date = new Date().getTime();
-    newPost.title = title;
-    newPost.content = content;
-    newPost.author = author;
+    newPost.uuid = UUID.randomUUID().toString(); // readonly
+    newPost.date = new Date().getTime(); // readonly
+    newPost.title = title; // readonly
+    newPost.content = content; // readonly
+    newPost.author = author; // readonly
     newPost.comments = new LinkedList<String>(); // needs manual synchronization
-    newPost.upvotes = 0;
-    newPost.downvotes = 0;
+    newPost.upvotes = 0; // needs manual synchronization
+    newPost.downvotes = 0; // needs manual synchronization
 
     return newPost;
   }

@@ -25,6 +25,8 @@ public class HttpRequestTest {
       "Host: www.tutorialspoint.com" + CRLF +
       "Accept-Language: en-us" + CRLF +
       "Accept-Encoding: gzip, deflate" + CRLF +
+      "Content-Type: application/json" + CRLF +
+      "Content-Length: 46" + CRLF +
       "Connection: Keep-Alive" + CRLF +
       CRLF +
       "{\"field\":\"property\",\"array\":[1,2,{\"three\":3}]}";
@@ -76,6 +78,8 @@ public class HttpRequestTest {
         .flatMap(req -> req.setHeader("Host", "www.tutorialspoint.com"))
         .flatMap(req -> req.setHeader("Accept-Language", "en-us"))
         .flatMap(req -> req.setHeader("Accept-Encoding", "gzip, deflate"))
+        .flatMap(req -> req.setHeader("Content-Type", "application/json"))
+        .flatMap(req -> req.setHeader("Content-Length", "46"))
         .flatMap(req -> req.setHeader("Connection", "Keep-Alive"))
         .flatMap(req -> req.setBody("{\"field\":\"property\",\"array\":[1,2,{\"three\":3}]}"));
 

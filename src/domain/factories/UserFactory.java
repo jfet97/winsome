@@ -27,10 +27,10 @@ public class UserFactory {
 
       if (username == null)
         errorMessage = "username cannot be null";
-      else if (username == "")
+      else if (username.equals(""))
         errorMessage = "username cannot be empty";
 
-      return errorMessage != "" ? Validation.invalid(errorMessage) : Validation.valid(username);
+      return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(username);
     }
 
     private Validation<String, String> validatePassword(String password) {
@@ -38,10 +38,10 @@ public class UserFactory {
 
       if (password == null)
         errorMessage = "password cannot be null";
-      else if (password == "")
+      else if (password.equals(""))
         errorMessage = "password cannot be empty";
 
-      return errorMessage != "" ? Validation.invalid(errorMessage) : Validation.valid(password);
+      return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(password);
     }
 
     private Validation<String, List<String>> validateTags(List<String> tags) {
@@ -53,17 +53,16 @@ public class UserFactory {
         errorMessage = "tags list cannot be empty";
 
       var uniqueTags = tags;
-      if (errorMessage == "") {
+      if (errorMessage.equals("")) {
         uniqueTags = tags.stream().distinct().collect(Collectors.toList());
 
         if (uniqueTags.size() > 5)
           errorMessage = "tags list cannot contain more than 5 distinct elements";
       }
 
-      return errorMessage != "" ? Validation.invalid(errorMessage) : Validation.valid(uniqueTags);
+      return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(uniqueTags);
 
     }
-
   };
 
   public static Validation<Seq<String>, User> create(String username, String password, List<String> tags) {

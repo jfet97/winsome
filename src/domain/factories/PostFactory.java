@@ -25,10 +25,10 @@ public class PostFactory {
         errorMessage = "title cannot be null";
       else if (title.length() > 20)
         errorMessage = "title max length is 20 characters";
-      else if (title == "")
+      else if (title.equals(""))
         errorMessage = "title cannot be empty";
 
-      return errorMessage != "" ? Validation.invalid(errorMessage) : Validation.valid(title);
+      return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(title);
     }
 
     private Validation<String, String> validateContent(String content) {
@@ -38,10 +38,10 @@ public class PostFactory {
         errorMessage = "content cannot be null";
       else if (content.length() > 500)
         errorMessage = "content max length is 500 characters";
-      else if (content == "")
+      else if (content.equals(""))
         errorMessage = "content cannot be empty";
 
-      return errorMessage != "" ? Validation.invalid(errorMessage) : Validation.valid(content);
+      return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(content);
     }
 
     private Validation<String, String> validateAuthor(String author) {

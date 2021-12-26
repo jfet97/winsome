@@ -24,7 +24,7 @@ public class Post {
     newPost.title = title;
     newPost.content = content;
     newPost.author = author;
-    newPost.comments = new LinkedList<String>();
+    newPost.comments = new LinkedList<String>(); // needs manual synchronization
     newPost.upvotes = 0;
     newPost.downvotes = 0;
 

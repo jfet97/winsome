@@ -2,6 +2,8 @@ package domain.pojos;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import utils.HashPassword;
 
@@ -9,7 +11,7 @@ public class User {
   public String username;
   public String password;
   public List<String> tags;
-  public List<Post> posts;
+  public ConcurrentMap<String, Post> posts;
   public List<String> followers;
   public List<String> following;
 
@@ -18,10 +20,10 @@ public class User {
 
     newUser.username = username;
     newUser.password = HashPassword.hash(password);
-    newUser.tags = tags;
-    newUser.posts = new LinkedList<Post>();
-    newUser.followers = new LinkedList<String>();
-    newUser.following = new LinkedList<String>();
+    newUser.tags = tags; // needs manual synchronization
+    newUser.posts = new ConcurrentHashMap<String, Post>();
+    newUser.followers = new LinkedList<String>(); // needs manual synchronization
+    newUser.following = new LinkedList<String>(); // needs manual synchronization
 
     return newUser;
   }

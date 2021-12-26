@@ -1,10 +1,10 @@
-package http.request.tests;
+package http.tests;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import http.request.HttpRequest;
+import http.HttpRequest;
 
 public class HttpRequestTest {
 

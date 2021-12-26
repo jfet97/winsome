@@ -2,13 +2,13 @@ package jexpress;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import http.HttpRequest;
 import http.HttpResponse;
 import io.vavr.control.Either;
 import jexpress.expressrouting.ExpressRoute;
+import utils.TriConsumer;
 
 public class JExpress {
 
@@ -20,7 +20,7 @@ public class JExpress {
   private final String PATCH = "PATCH";
   private final String DELETE = "DELETE";
 
-  private final Map<String, Map<ExpressRoute, BiConsumer<HttpRequest, Consumer<Either<String, HttpResponse>>>>> routes = new HashMap<>();
+  private final Map<String, Map<ExpressRoute, TriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>>>> routes = new HashMap<>();
 
   public JExpress() {
     this.routes.put(GET, new HashMap<>());
@@ -32,31 +32,31 @@ public class JExpress {
 
   // callback registration
   private void add(ExpressRoute route, String method,
-      BiConsumer<HttpRequest, Consumer<Either<String, HttpResponse>>> cb) {
+      TriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>> cb) {
     this.routes.get(method).put(route, cb);
   }
 
-  public void get(String route, BiConsumer<HttpRequest, Consumer<Either<String, HttpResponse>>> cb) {
+  public void get(String route, TriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>> cb) {
     var jexpressRoute = new ExpressRoute(route);
     this.add(jexpressRoute, GET, cb);
   }
 
-  public void post(String route, BiConsumer<HttpRequest, Consumer<Either<String, HttpResponse>>> cb) {
+  public void post(String route, TriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>> cb) {
     var jexpressRoute = new ExpressRoute(route);
     this.add(jexpressRoute, POST, cb);
   }
 
-  public void put(String route, BiConsumer<HttpRequest, Consumer<Either<String, HttpResponse>>> cb) {
+  public void put(String route, TriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>> cb) {
     var jexpressRoute = new ExpressRoute(route);
     this.add(jexpressRoute, PUT, cb);
   }
 
-  public void patch(String route, BiConsumer<HttpRequest, Consumer<Either<String, HttpResponse>>> cb) {
+  public void patch(String route, TriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>> cb) {
     var jexpressRoute = new ExpressRoute(route);
     this.add(jexpressRoute, PATCH, cb);
   }
 
-  public void delete(String route, BiConsumer<HttpRequest, Consumer<Either<String, HttpResponse>>> cb) {
+  public void delete(String route, TriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>> cb) {
     var jexpressRoute = new ExpressRoute(route);
     this.add(jexpressRoute, DELETE, cb);
   }
@@ -79,8 +79,10 @@ public class JExpress {
             var route = entry.getKey();
             var handler = entry.getValue();
 
-            if (route.matches(request.getRequestTarget())) {
-              handler.accept(request, eresponse -> {
+            if (route.matches(target)) {
+              var parametersFromPath = route.getParametersFromPath(target);
+
+              handler.accept(request, parametersFromPath, eresponse -> {
                 var response = eresponse.getOrElseGet(err -> HttpResponse
                     .build(HttpResponse.HTTPV11, HttpResponse.CODE_500[0], HttpResponse.CODE_500[1])
                     .flatMap(res -> res.setHeader("Content-Type", "text/plain; charset=UTF-8"))
@@ -96,7 +98,7 @@ public class JExpress {
           // not found a proper handler for the request target
           var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_404[0], HttpResponse.CODE_404[1])
               .flatMap(res -> res.setHeader("Content-Type", "text/plain; charset=UTF-8"))
-              .flatMap(res -> res.setBody(request.getRequestTarget() + " not found"))
+              .flatMap(res -> res.setBody(target + " not found"))
               .get();
 
           // send this response

@@ -19,7 +19,7 @@ import domain.pojos.Reaction;
 import domain.pojos.User;
 import winsome.Winsome;
 
-public class WinsomeToJson {
+public class WinsomeToJsonTest {
   @Test
   public void fromtoJSONSingleThread()
       throws NoSuchFieldException, SecurityException, IllegalArgumentException, IllegalAccessException,

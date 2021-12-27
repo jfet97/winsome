@@ -29,6 +29,24 @@ public class Post {
     return instance;
   }
 
+  public Long getUpvotes() {
+    synchronized (this.reactions) {
+      return this.reactions
+          .stream()
+          .filter(r -> r.isUpvote)
+          .count();
+    }
+  }
+
+  public Long getDownvotes() {
+    synchronized (this.reactions) {
+      return this.reactions
+          .stream()
+          .filter(r -> !r.isUpvote)
+          .count();
+    }
+  }
+
   public String toJSON() {
 
     var commentsLine = "\"comments\":[";
@@ -44,7 +62,7 @@ public class Post {
     synchronized (this.reactions) {
       reactionsLine += this.reactions
           .stream()
-          .map(c -> c.toJSON())
+          .map(r -> r.toJSON())
           .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
     }
     reactionsLine += "]";
@@ -58,6 +76,36 @@ public class Post {
         "\"author\":" + "\"" + this.author + "\"" + ",",
         commentsLine + ",",
         reactionsLine,
+        "}");
+  }
+
+  public String toJSONMinimal() {
+    return String.join("",
+        "{",
+        "\"uuid\":" + "\"" + this.uuid + "\"" + ",",
+        "\"title\":" + "\"" + this.title + "\"" + ",",
+        "\"author\":" + "\"" + this.author + "\"",
+        "}");
+  }
+
+  public String toJSONDetails() {
+
+    var commentsLine = "\"comments\":[";
+    synchronized (this.comments) {
+      commentsLine += this.comments
+          .stream()
+          .map(c -> c.toJSON())
+          .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
+    }
+    commentsLine += "]";
+
+    return String.join("",
+        "{",
+        "\"title\":" + "\"" + this.title + "\"" + ",",
+        "\"content\":" + "\"" + this.content + "\"" + ",",
+        "\"upvotes\":" + "\"" + this.getUpvotes() + "\"" + ",",
+        "\"downvotes\":" + "\"" + this.getUpvotes() + "\"" + ",",
+        commentsLine,
         "}");
   }
 }

@@ -33,7 +33,7 @@ public class User {
     var tagsLine = "\"tags\":[";
     tagsLine += this.tags
         .stream()
-        .map(c -> "\"" + c.toString() + "\"")
+        .map(t -> "\"" + t.toString() + "\"")
         .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
     tagsLine += "]";
 
@@ -48,7 +48,7 @@ public class User {
     synchronized (this.followers) {
       followersLine += this.followers
           .stream()
-          .map(c -> "\"" + c.toString() + "\"")
+          .map(f -> "\"" + f.toString() + "\"")
           .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
     }
     followersLine += "]";
@@ -57,7 +57,7 @@ public class User {
     synchronized (this.following) {
       followingLine += this.following
           .stream()
-          .map(c -> "\"" + c.toString() + "\"")
+          .map(f -> "\"" + f.toString() + "\"")
           .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
     }
     followingLine += "]";

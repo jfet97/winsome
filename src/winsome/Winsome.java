@@ -28,6 +28,7 @@ public class Winsome {
   public Map<String, User> getNetwork() {
     return Collections.unmodifiableMap(this.network);
   }
+
   public Map<String, Boolean> getLoggedUsers() {
     return Collections.unmodifiableMap(this.loggedUsers);
   }
@@ -111,7 +112,6 @@ public class Winsome {
   }
 
   public String toJSON() {
- 
 
     var networkLine = "\"network\":{";
     networkLine += this.network.entrySet()

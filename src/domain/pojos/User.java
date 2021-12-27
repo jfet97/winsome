@@ -4,6 +4,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import utils.HashPassword;
@@ -62,6 +63,16 @@ public class User {
   public Boolean removeFollowing(String following) {
     synchronized (this.following) {
       return this.following.remove(following);
+    }
+  }
+
+  public <R> R computeIfIsFollowerOf(String username, Supplier<R> ifIsFollower, Supplier<R> ifIsNotFollower) {
+    synchronized (this.following) {
+      if (this.following.contains(username)) {
+        return ifIsFollower.get();
+      } else {
+        return ifIsNotFollower.get();
+      }
     }
   }
 

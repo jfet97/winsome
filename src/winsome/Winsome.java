@@ -15,9 +15,13 @@ import java.util.stream.Collectors;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 
+import domain.factories.CommentFactory;
 import domain.factories.PostFactory;
+import domain.factories.ReactionFactory;
 import domain.factories.UserFactory;
+import domain.pojos.Comment;
 import domain.pojos.Post;
+import domain.pojos.Reaction;
 import domain.pojos.User;
 import io.vavr.control.Either;
 import secrets.Secrets;
@@ -334,6 +338,86 @@ public class Winsome {
         .flatMap(
             t -> t.fst().username.equals(t.snd().username) ? Either.left("cannot rewin own post") : Either.right(t))
         .flatMap(t -> makePost(t.trd().title, t.trd().content, t.fst().username));
+  }
+
+  public Either<String, Reaction> ratePost(String username, String author, String postUuid, Boolean isUpvote) {
+    return nullGuard(username, "username")
+        .flatMap(__ -> nullGuard(author, "author"))
+        .flatMap(__ -> nullGuard(postUuid, "postUuid"))
+        .flatMap(__ -> nullGuard(isUpvote, "isUpvote"))
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user " + username) : Either.right(u))
+        .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
+        .flatMap(u -> Either.<String, User>right(network.get(author))
+            .flatMap(a -> a == null ? Either.left("unknown user " + author)
+                : getPost(a.username, postUuid).map(p -> Triple.of(u, a, p))))
+        .flatMap(
+            t -> t.fst().username.equals(t.snd().username) ? Either.left("cannot rate own post") : Either.right(t))
+        .flatMap(
+            t -> {
+              var u = t.fst();
+              var a = t.snd();
+              var p = t.trd();
+
+              synchronized (u.following) {
+                synchronized (p.reactions) {
+                  var toRet = Either.<String, Reaction>right(null);
+
+                  if (!u.following.contains(a.username))
+                    toRet = Either.left("cannot rate post not in feed");
+                  else if (p.reactions.stream().anyMatch(r -> r.username.equals(u.username)))
+                    toRet = Either.left("cannot rate a post twice");
+                  else
+                    toRet = ReactionFactory.create(isUpvote, p.uuid, u.username)
+                        .toEither()
+                        .mapLeft(set -> set.mkString("\n"));
+
+                  toRet.forEach(p.reactions::add);
+
+                  return toRet;
+
+                }
+              }
+            });
+  }
+
+  public Either<String, Comment> ratePost(String username, String author, String postUuid, String text) {
+    return nullGuard(username, "username")
+        .flatMap(__ -> nullGuard(author, "author"))
+        .flatMap(__ -> nullGuard(postUuid, "postUuid"))
+        .flatMap(__ -> nullGuard(text, "text"))
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user " + username) : Either.right(u))
+        .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
+        .flatMap(u -> Either.<String, User>right(network.get(author))
+            .flatMap(a -> a == null ? Either.left("unknown user " + author)
+                : getPost(a.username, postUuid).map(p -> Triple.of(u, a, p))))
+        .flatMap(
+            t -> t.fst().username.equals(t.snd().username) ? Either.left("cannot comment own post") : Either.right(t))
+        .flatMap(
+            t -> {
+              var u = t.fst();
+              var a = t.snd();
+              var p = t.trd();
+
+              synchronized (u.following) {
+                synchronized (p.comments) {
+                  var toRet = Either.<String, Comment>right(null);
+
+                  if (!u.following.contains(a.username))
+                    toRet = Either.left("cannot rate post not in feed");
+                  else
+                    toRet = CommentFactory.create(text, postUuid, u.username)
+                        .toEither()
+                        .mapLeft(set -> set.mkString("\n"));
+
+                  toRet.forEach(p.comments::add);
+
+                  return toRet;
+
+                }
+              }
+            });
   }
 
   public String toJSON() {

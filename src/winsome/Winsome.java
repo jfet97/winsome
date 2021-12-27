@@ -4,6 +4,7 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -14,6 +15,7 @@ import java.util.stream.Collectors;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 
+import domain.factories.PostFactory;
 import domain.factories.UserFactory;
 import domain.pojos.Post;
 import domain.pojos.User;
@@ -179,6 +181,7 @@ public class Winsome {
             : Either.<String, User>right(network.get(usernameToFollow))
                 .flatMap(
                     u2 -> u2 == null ? Either.left("unknown user " + usernameToFollow) : Either.right(Pair.of(u, u2))))
+        .flatMap(p -> !loggedUsers.containsKey(p.fst().username) ? Either.left("user is not logged") : Either.right(p))
         .flatMap(p -> {
           p.fst().addFollowing(p.snd().username);
           p.snd().addFollower(p.fst().username);
@@ -196,11 +199,57 @@ public class Winsome {
                 .flatMap(
                     u2 -> u2 == null ? Either.left("unknown user " + usernameToUnfollow)
                         : Either.right(Pair.of(u, u2))))
+        .flatMap(p -> !loggedUsers.containsKey(p.fst().username) ? Either.left("user is not logged") : Either.right(p))
         .flatMap(p -> {
           p.fst().removeFollowing(p.snd().username);
           p.snd().removeFollower(p.fst().username);
           return Either.<String, Void>right(null);
         });
+  }
+
+  public Either<String, List<String>> viewBlog(String username) {
+
+    return nullGuard(username, "username")
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
+        .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
+        .map(u -> u.posts.entrySet()
+            .stream()
+            .map(e -> e.getValue().toJSONMinimal())
+            .collect(Collectors.toList()));
+  }
+
+  public Either<String, Post> createPost(String username, String title, String content) {
+
+    return nullGuard(username, "username")
+        .flatMap(__ -> nullGuard(title, "title"))
+        .flatMap(__ -> nullGuard(content, "content"))
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
+        .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
+        .flatMap(u -> PostFactory.create(title, content, username)
+            .toEither()
+            .mapLeft(seq -> seq.mkString("\n"))
+            .map(post -> Pair.of(u, post)))
+        .map(pair -> pair.fst().posts.computeIfAbsent(pair.snd().uuid, __ -> pair.snd()));
+  }
+
+  public Either<String, List<String>> showFeed(String username) {
+
+    return nullGuard(username, "username")
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
+        .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
+        .map(u -> u.getFollowing())
+        .flatMap(us -> Either.sequence(
+            us.stream()
+                .map(u -> viewBlog(u))
+                .collect(Collectors.toList()))
+            .mapLeft(seq -> seq.mkString("\n"))
+            .map(seq -> seq.fold(new LinkedList<String>(), (acc, curr) -> {
+              acc.addAll(curr);
+              return acc;
+            })));
   }
 
   public String toJSON() {

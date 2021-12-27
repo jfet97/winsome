@@ -99,7 +99,30 @@ public class Winsome {
             return Either.left("user already logged");
           }
         });
+  }
 
+  @Override
+  public String toString() {
+
+    var networkLine = "\"network\": {\n";
+    networkLine += this.network.entrySet()
+        .stream()
+        .map(e -> "\"" + e.getKey() + "\": " + e.getValue())
+        .reduce("", (acc, curr) -> acc + ",\n" + curr);
+    networkLine += "\n}";
+
+    var loggedUsersLine = "\"loggedUsers\": {\n";
+    loggedUsersLine += this.loggedUsers.entrySet()
+        .stream()
+        .map(e -> "\"" + e.getKey() + "\": " + e.getValue())
+        .reduce("", (acc, curr) -> acc + ",\n" + curr);
+    loggedUsersLine += "\n}";
+
+    return String.join("\n",
+        "{",
+        "  " + networkLine + ",",
+        "  " + loggedUsersLine,
+        "}");
   }
 
 }

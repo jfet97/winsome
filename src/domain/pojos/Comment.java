@@ -19,4 +19,16 @@ public class Comment {
 
     return instance;
   }
+
+  @Override
+  public String toString() {
+
+    return String.join("\n",
+        "{",
+        "  \"text\": " + "\"" + this.text + "\"" + ",",
+        "  \"date\": " + this.date + ",",
+        "  \"postUuid\": " + "\"" + this.postUuid + "\"" + ",",
+        "  \"username\": " + "\"" + this.username + "\"",
+        "}");
+  }
 }

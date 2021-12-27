@@ -19,4 +19,16 @@ public class Reaction {
 
     return instance;
   }
+
+  @Override
+  public String toString() {
+
+    return String.join("\n",
+        "{",
+        "  \"isUpvote\": " + this.isUpvote + ",",
+        "  \"date\": " + this.date + ",",
+        "  \"postUuid\": " + "\"" + this.postUuid + "\"" + ",",
+        "  \"username\": " + "\"" + this.username + "\"",
+        "}");
+  }
 }

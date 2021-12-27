@@ -28,4 +28,37 @@ public class Post {
 
     return instance;
   }
+
+  @Override
+  public String toString() {
+
+    var commentsLine = "\"comments\": [\n";
+    synchronized (this.comments) {
+      commentsLine += this.comments
+          .stream()
+          .map(c -> c.toString())
+          .reduce("", (acc, curr) -> acc + ",\n" + curr);
+    }
+    commentsLine += "\n]";
+
+    var reactionsLine = "\"reactions\": ";
+    synchronized (this.reactions) {
+      reactionsLine += this.reactions
+          .stream()
+          .map(c -> c.toString())
+          .reduce("", (acc, curr) -> acc + ",\n" + curr);
+    }
+    reactionsLine += "\n]";
+
+    return String.join("\n",
+        "{",
+        "  \"uuid\": " + "\"" + this.uuid + "\"" + ",",
+        "  \"date\": " + this.date + ",",
+        "  \"title\": " + "\"" + this.title + "\"" + ",",
+        "  \"content\": " + "\"" + this.content + "\"" + ",",
+        "  \"author\": " + "\"" + this.author + "\"" + ",",
+        "  " + commentsLine + ",",
+        "  " + reactionsLine,
+        "}");
+  }
 }

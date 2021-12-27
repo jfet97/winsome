@@ -13,6 +13,7 @@ public class Post {
   public String author;
   public List<Comment> comments;
   public List<Reaction> reactions;
+  public Long walletScannerIteration;
 
   public static Post of(String title, String content, String author) {
 
@@ -25,6 +26,7 @@ public class Post {
     instance.author = author; // readonly
     instance.comments = new LinkedList<Comment>(); // needs manual synchronization
     instance.reactions = new LinkedList<Reaction>(); // needs manual synchronization
+    instance.walletScannerIteration = 1L; // needs manual synchronization (wallet thread and persistence thread)
 
     return instance;
   }
@@ -45,6 +47,14 @@ public class Post {
           .filter(r -> !r.isUpvote)
           .count();
     }
+  }
+
+  public synchronized Long getWalletScannerIteration() {
+    return this.walletScannerIteration;
+  }
+
+  public synchronized void incrementWalletScannerIteration() {
+    this.walletScannerIteration += 1;
   }
 
   public String toJSON() {
@@ -105,6 +115,7 @@ public class Post {
         "\"content\":" + "\"" + this.content + "\"" + ",",
         "\"upvotes\":" + "\"" + this.getUpvotes() + "\"" + ",",
         "\"downvotes\":" + "\"" + this.getUpvotes() + "\"" + ",",
+        "\"walletScannerIteration\":" + "\"" + this.getWalletScannerIteration() + "\"" + ",",
         commentsLine,
         "}");
   }

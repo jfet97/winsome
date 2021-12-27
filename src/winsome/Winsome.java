@@ -1,19 +1,18 @@
 package winsome;
 
-import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import domain.factories.CommentFactory;
 import domain.factories.PostFactory;
@@ -23,6 +22,7 @@ import domain.pojos.Comment;
 import domain.pojos.Post;
 import domain.pojos.Reaction;
 import domain.pojos.User;
+import domain.pojos.wallet.Wallet;
 import io.vavr.control.Either;
 import secrets.Secrets;
 import utils.HashPassword;
@@ -33,6 +33,8 @@ public class Winsome {
 
   private final ConcurrentMap<String, User> network = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, Boolean> loggedUsers = new ConcurrentHashMap<>();
+  @JsonProperty("wallet")
+  private final Wallet wallet = Wallet.of();
 
   public Map<String, User> getNetwork() {
     return Collections.unmodifiableMap(this.network);
@@ -41,32 +43,6 @@ public class Winsome {
   public Map<String, Boolean> getLoggedUsers() {
     return Collections.unmodifiableMap(this.loggedUsers);
   }
-
-  /**
-   * private void test() {
-   * var user = network.get("test");
-   * 
-   * if (user != null) {
-   * 
-   * synchronized(user.followers) {
-   * user.followers.add("Banana");
-   * }
-   * 
-   * Post post = user.posts.get("idOfAPost");
-   * 
-   * if (post != null) {
-   * synchronized (post.comments) {
-   * post.comments.add("banane");
-   * }
-   * 
-   * synchronized (post.comments) {
-   * // iterate over post.comments
-   * }
-   * 
-   * }
-   * }
-   * }
-   */
 
   private <T> Either<String, T> nullGuard(T x, String name) {
     if (x == null) {
@@ -127,7 +103,15 @@ public class Winsome {
           // putIfAbsent returns null if there was no previous mapping for the key
           // => success
           if (u == null) {
-            return euser;
+            var addUserRes = wallet.addUser(username);
+            if (addUserRes.isRight()) {
+              return euser;
+            } else {
+              // maintain consistency
+              network.remove(username);
+              return addUserRes.flatMap(__ -> euser);
+            }
+
           } else {
             return Either.left("user already exists");
           }
@@ -439,7 +423,8 @@ public class Winsome {
     return String.join("",
         "{",
         networkLine + ",",
-        loggedUsersLine,
+        loggedUsersLine + ",",
+        "\"wallet\":" + wallet.toJSON(),
         "}");
   }
 

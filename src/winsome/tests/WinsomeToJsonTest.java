@@ -17,6 +17,7 @@ import domain.pojos.Comment;
 import domain.pojos.Post;
 import domain.pojos.Reaction;
 import domain.pojos.User;
+import domain.pojos.wallet.Wallet;
 import winsome.Winsome;
 
 public class WinsomeToJsonTest {
@@ -35,11 +36,22 @@ public class WinsomeToJsonTest {
     loggedUsersField.setAccessible(true);
     var loggedUsers = (ConcurrentMap<String, Boolean>) loggedUsersField.get(winsome);
 
+    var walletField = Winsome.class.getDeclaredField("wallet");
+    walletField.setAccessible(true);
+    var wallet = (Wallet) walletField.get(winsome);
+
     var user1 = User.of("user1", "abcde", Arrays.asList(new String[] { "tag1", "tag2" }));
     var user2 = User.of("user2", "12345", Arrays.asList(new String[] { "tag2", "tag3" }));
 
     network.put("user1", user1);
     network.put("user2", user2);
+
+    wallet.addUser("user1").isRight();
+    wallet.addUser("user2").isRight();
+
+    wallet.addTransaction("user1", 2.6).isRight();
+    wallet.addTransaction("user1", 4.8).isRight();
+    wallet.addTransaction("user2", 9.5).isRight();
 
     loggedUsers.put("user1", true);
     loggedUsers.put("user2", true);

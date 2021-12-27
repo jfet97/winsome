@@ -4,6 +4,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
 
 import utils.HashPassword;
 
@@ -26,6 +27,42 @@ public class User {
     instance.following = new LinkedList<String>(); // needs manual synchronization
 
     return instance;
+  }
+
+  public List<String> getFollowers() {
+    synchronized (this.followers) {
+      return this.followers.stream().collect(Collectors.toList());
+    }
+  }
+
+  public List<String> getFollowing() {
+    synchronized (this.following) {
+      return this.following.stream().collect(Collectors.toList());
+    }
+  }
+
+  public Boolean addFollower(String follower) {
+    synchronized (this.followers) {
+      return this.followers.add(follower);
+    }
+  }
+
+  public Boolean addFollowing(String following) {
+    synchronized (this.following) {
+      return this.following.add(following);
+    }
+  }
+
+  public Boolean removeFollower(String follower) {
+    synchronized (this.followers) {
+      return this.followers.remove(follower);
+    }
+  }
+
+  public Boolean removeFollowing(String following) {
+    synchronized (this.following) {
+      return this.following.remove(following);
+    }
   }
 
   public String toJSON() {

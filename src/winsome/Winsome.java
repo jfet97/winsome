@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
@@ -19,6 +20,7 @@ import domain.pojos.User;
 import io.vavr.control.Either;
 import secrets.Secrets;
 import utils.HashPassword;
+import utils.Pair;
 
 public class Winsome {
 
@@ -59,6 +61,14 @@ public class Winsome {
    * }
    */
 
+  private <T> Either<String, T> nullGuard(T x, String name) {
+    if (x == null) {
+      return Either.left(name + " cannot be null");
+    } else {
+      return Either.right(x);
+    }
+  }
+
   public Either<String, User> register(String username, String password, List<String> tags) {
 
     // we have to avoid data race condition:
@@ -84,7 +94,9 @@ public class Winsome {
 
   public Either<String, String> login(String username, String password) {
 
-    return Either.<String, User>right(network.get(username))
+    return nullGuard(username, "username")
+        .flatMap(__ -> nullGuard(password, "password"))
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
         .flatMap(u -> !HashPassword.hash(password).equals(u.password) ? Either.left("invalid password")
             : Either.right(u))
@@ -108,6 +120,86 @@ public class Winsome {
           } else {
             return Either.left("user already logged");
           }
+        });
+  }
+
+  public Either<String, Void> logout(String username) {
+
+    return nullGuard(username, "username")
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
+        .flatMap(u -> {
+          if (loggedUsers.remove(u.username)) {
+            return Either.<String, Void>right(null);
+          } else {
+            return Either.left("user was not logged");
+          }
+        });
+  }
+
+  public Either<String, List<String>> listUsers(String username) {
+
+    return nullGuard(username, "username")
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
+        .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
+        .map(u -> {
+          return network.entrySet()
+              .stream()
+              .filter(e -> e.getKey() != u.username && e.getValue().tags.stream().anyMatch(t -> u.tags.contains(t)))
+              .map(e -> e.getValue().username)
+              .collect(Collectors.toList());
+        });
+  }
+
+  public Either<String, List<String>> listFollowers(String username) {
+
+    return nullGuard(username, "username")
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
+        .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
+        .map(u -> u.getFollowers());
+  }
+
+  public Either<String, List<String>> listFollowing(String username) {
+
+    return nullGuard(username, "username")
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
+        .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
+        .map(u -> u.getFollowing());
+  }
+
+  public Either<String, Void> followUser(String username, String usernameToFollow) {
+
+    return nullGuard(username, "username")
+        .flatMap(__ -> nullGuard(usernameToFollow, "usernameToFollow"))
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user " + username)
+            : Either.<String, User>right(network.get(usernameToFollow))
+                .flatMap(
+                    u2 -> u2 == null ? Either.left("unknown user " + usernameToFollow) : Either.right(Pair.of(u, u2))))
+        .flatMap(p -> {
+          p.fst().addFollowing(p.snd().username);
+          p.snd().addFollower(p.fst().username);
+          return Either.<String, Void>right(null);
+        });
+  }
+
+  public Either<String, Void> unfollowUser(String username, String usernameToUnfollow) {
+
+    return nullGuard(username, "username")
+        .flatMap(__ -> nullGuard(usernameToUnfollow, "usernameToFollow"))
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user " + username)
+            : Either.<String, User>right(network.get(usernameToUnfollow))
+                .flatMap(
+                    u2 -> u2 == null ? Either.left("unknown user " + usernameToUnfollow)
+                        : Either.right(Pair.of(u, u2))))
+        .flatMap(p -> {
+          p.fst().removeFollowing(p.snd().username);
+          p.snd().removeFollower(p.fst().username);
+          return Either.<String, Void>right(null);
         });
   }
 

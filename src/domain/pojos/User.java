@@ -16,15 +16,15 @@ public class User {
   public List<String> following;
 
   public static User of(String username, String password, List<String> tags) {
-    var newUser = new User();
+    var instance = new User();
 
-    newUser.username = username; // readonly
-    newUser.password = HashPassword.hash(password); // readonly
-    newUser.tags = tags; // readonly
-    newUser.posts = new ConcurrentHashMap<String, Post>();
-    newUser.followers = new LinkedList<String>(); // needs manual synchronization
-    newUser.following = new LinkedList<String>(); // needs manual synchronization
+    instance.username = username; // readonly
+    instance.password = HashPassword.hash(password); // readonly
+    instance.tags = tags; // readonly
+    instance.posts = new ConcurrentHashMap<String, Post>();
+    instance.followers = new LinkedList<String>(); // needs manual synchronization
+    instance.following = new LinkedList<String>(); // needs manual synchronization
 
-    return newUser;
+    return instance;
   }
 }

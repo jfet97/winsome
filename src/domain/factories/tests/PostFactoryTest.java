@@ -24,7 +24,7 @@ public class PostFactoryTest {
 
   @Test
   void maxLengthExceededTitle() {
-    var epost = PostFactory.create(new String(new char[21]).replace('\0', ' '), "Random content", "John Doe");
+    var epost = PostFactory.create(new String(new char[21]).replace('\0', 'a'), "Random content", "John Doe");
     assertEquals(epost.isValid(), false);
     assertEquals(epost.fold(set -> set.get(0), __ -> ""), "title max length is 20 characters");
   }
@@ -45,7 +45,7 @@ public class PostFactoryTest {
 
   @Test
   void maxLengthExceededContent() {
-    var epost = PostFactory.create("A title", new String(new char[501]).replace('\0', ' '), "John Doe");
+    var epost = PostFactory.create("A title", new String(new char[501]).replace('\0', 'a'), "John Doe");
     assertEquals(epost.isValid(), false);
     assertEquals(epost.fold(set -> set.get(0), __ -> ""), "content max length is 500 characters");
   }
@@ -85,8 +85,6 @@ public class PostFactoryTest {
     assertEquals(post.author, "John Doe");
     assertEquals(post.content, "Random content");
     assertEquals(post.title, "A title");
-    assertEquals(post.downvotes, 0);
-    assertEquals(post.downvotes, 0);
     assertTrue(post.comments.isEmpty());
 
   }

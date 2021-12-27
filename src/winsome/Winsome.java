@@ -1,3 +1,4 @@
+package winsome;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -25,8 +26,8 @@ public class Winsome {
           post.comments.add("banane");
         }
 
-        synchronized (post) {
-          post.upvotes += 1;
+        synchronized (post.comments) {
+          // iterate over post.comments
         }
 
       }

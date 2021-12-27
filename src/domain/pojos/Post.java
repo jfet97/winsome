@@ -11,23 +11,21 @@ public class Post {
   public String title;
   public String content;
   public String author;
-  public List<String> comments;
-  public Integer upvotes;
-  public Integer downvotes;
+  public List<Comment> comments;
+  public List<Reaction> reactions;
 
   public static Post of(String title, String content, String author) {
 
-    var newPost = new Post();
+    var instance = new Post();
 
-    newPost.uuid = UUID.randomUUID().toString(); // readonly
-    newPost.date = new Date().getTime(); // readonly
-    newPost.title = title; // readonly
-    newPost.content = content; // readonly
-    newPost.author = author; // readonly
-    newPost.comments = new LinkedList<String>(); // needs manual synchronization
-    newPost.upvotes = 0; // needs manual synchronization
-    newPost.downvotes = 0; // needs manual synchronization
+    instance.uuid = UUID.randomUUID().toString(); // readonly
+    instance.date = new Date().getTime(); // readonly
+    instance.title = title; // readonly
+    instance.content = content; // readonly
+    instance.author = author; // readonly
+    instance.comments = new LinkedList<Comment>(); // needs manual synchronization
+    instance.reactions = new LinkedList<Reaction>(); // needs manual synchronization
 
-    return newPost;
+    return instance;
   }
 }

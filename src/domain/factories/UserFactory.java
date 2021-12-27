@@ -24,24 +24,26 @@ public class UserFactory {
 
     private Validation<String, String> validateUsername(String username) {
       var errorMessage = "";
+      var usernameTrimmed = username != null ? username.trim() : null;
 
-      if (username == null)
+      if (usernameTrimmed == null)
         errorMessage = "username cannot be null";
-      else if (username.equals(""))
+      else if (usernameTrimmed.equals(""))
         errorMessage = "username cannot be empty";
 
-      return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(username);
+      return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(usernameTrimmed);
     }
 
     private Validation<String, String> validatePassword(String password) {
       var errorMessage = "";
+      var passwordTrimmed = password != null ? password.trim() : null;
 
-      if (password == null)
+      if (passwordTrimmed == null)
         errorMessage = "password cannot be null";
-      else if (password.equals(""))
+      else if (passwordTrimmed.equals(""))
         errorMessage = "password cannot be empty";
 
-      return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(password);
+      return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(passwordTrimmed);
     }
 
     private Validation<String, List<String>> validateTags(List<String> tags) {
@@ -54,7 +56,8 @@ public class UserFactory {
 
       var uniqueTags = tags;
       if (errorMessage.equals("")) {
-        uniqueTags = tags.stream().distinct().collect(Collectors.toList());
+        uniqueTags = tags.stream().distinct().filter(tag -> tag != null && !tag.equals("")).map(String::trim)
+            .collect(Collectors.toList());
 
         if (uniqueTags.size() > 5)
           errorMessage = "tags list cannot contain more than 5 distinct elements";

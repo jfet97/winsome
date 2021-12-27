@@ -20,32 +20,34 @@ public class PostFactory {
 
     private Validation<String, String> validateTitle(String title) {
       var errorMessage = "";
+      var titleTrimmed = title != null ? title.trim() : null;
 
-      if (title == null)
+      if (titleTrimmed == null)
         errorMessage = "title cannot be null";
-      else if (title.length() > 20)
+      else if (titleTrimmed.length() > 20)
         errorMessage = "title max length is 20 characters";
-      else if (title.equals(""))
+      else if (titleTrimmed.equals(""))
         errorMessage = "title cannot be empty";
 
-      return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(title);
+      return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(titleTrimmed);
     }
 
     private Validation<String, String> validateContent(String content) {
       var errorMessage = "";
+      var contentTrimmed = content != null ? content.trim() : null;
 
-      if (content == null)
+      if (contentTrimmed == null)
         errorMessage = "content cannot be null";
-      else if (content.length() > 500)
+      else if (contentTrimmed.length() > 500)
         errorMessage = "content max length is 500 characters";
-      else if (content.equals(""))
+      else if (contentTrimmed.equals(""))
         errorMessage = "content cannot be empty";
 
-      return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(content);
+      return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(contentTrimmed);
     }
 
     private Validation<String, String> validateAuthor(String author) {
-      return author == null ? Validation.invalid("author cannot be null") : Validation.valid(author);
+      return author == null ? Validation.invalid("author cannot be null") : Validation.valid(author.trim());
     }
   };
 

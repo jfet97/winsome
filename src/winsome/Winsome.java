@@ -23,6 +23,7 @@ import io.vavr.control.Either;
 import secrets.Secrets;
 import utils.HashPassword;
 import utils.Pair;
+import utils.Triple;
 
 public class Winsome {
 
@@ -70,6 +71,41 @@ public class Winsome {
       return Either.right(x);
     }
   }
+
+  private Either<String, Post> getPost(String author, String postUuid) {
+
+    return nullGuard(author, "author")
+        .flatMap(__ -> nullGuard(postUuid, "postUuid"))
+        .flatMap(__ -> Either.<String, User>right(network.get(author)))
+        .flatMap(a -> {
+          var post = a.posts.get(postUuid);
+          return post == null ? Either.left("unknown post") : Either.right(post);
+        });
+  }
+
+  private Either<String, Post> makePost(String username, String title, String content) {
+
+    return nullGuard(username, "username")
+        .flatMap(__ -> nullGuard(title, "title"))
+        .flatMap(__ -> nullGuard(content, "content"))
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> PostFactory.create(title, content, username)
+            .toEither()
+            .mapLeft(seq -> seq.mkString("\n"))
+            .map(post -> Pair.of(u, post)))
+        .map(pair -> pair.fst().posts.computeIfAbsent(pair.snd().uuid, __ -> pair.snd()));
+  }
+
+  public Either<String, List<String>> viewUserBlog(String username) {
+    return nullGuard(username, "username")
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .map(u -> u.posts.entrySet()
+            .stream()
+            .map(e -> e.getValue().toJSONMinimal())
+            .collect(Collectors.toList()));
+  }
+
+  // API
 
   public Either<String, User> register(String username, String password, List<String> tags) {
 
@@ -213,10 +249,7 @@ public class Winsome {
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
         .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
-        .map(u -> u.posts.entrySet()
-            .stream()
-            .map(e -> e.getValue().toJSONMinimal())
-            .collect(Collectors.toList()));
+        .flatMap(u -> viewUserBlog(u.username));
   }
 
   public Either<String, Post> createPost(String username, String title, String content) {
@@ -227,11 +260,7 @@ public class Winsome {
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
         .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
-        .flatMap(u -> PostFactory.create(title, content, username)
-            .toEither()
-            .mapLeft(seq -> seq.mkString("\n"))
-            .map(post -> Pair.of(u, post)))
-        .map(pair -> pair.fst().posts.computeIfAbsent(pair.snd().uuid, __ -> pair.snd()));
+        .flatMap(u -> makePost(title, content, u.username));
   }
 
   public Either<String, List<String>> showFeed(String username) {
@@ -243,13 +272,68 @@ public class Winsome {
         .map(u -> u.getFollowing())
         .flatMap(us -> Either.sequence(
             us.stream()
-                .map(u -> viewBlog(u))
+                .map(u -> viewUserBlog(u))
                 .collect(Collectors.toList()))
             .mapLeft(seq -> seq.mkString("\n"))
             .map(seq -> seq.fold(new LinkedList<String>(), (acc, curr) -> {
               acc.addAll(curr);
               return acc;
             })));
+  }
+
+  public Either<String, String> showPost(String username, String author, String postUuid) {
+
+    return nullGuard(username, "username")
+        .flatMap(__ -> nullGuard(author, "author"))
+        .flatMap(__ -> nullGuard(postUuid, "postUuid"))
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user " + username) : Either.right(u))
+        .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
+        .flatMap(__ -> Either.<String, User>right(network.get(author)))
+        .flatMap(a -> a == null ? Either.left("unknown user " + author) : Either.right(a))
+        .flatMap(a -> getPost(a.username, postUuid))
+        .map(p -> p.toJSONDetails());
+  }
+
+  public Either<String, Void> deletePost(String username, String postUuid) {
+
+    return nullGuard(username, "username")
+        .flatMap(__ -> nullGuard(postUuid, "postUuid"))
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
+        .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
+        .flatMap(u -> {
+          var post = u.posts.get(postUuid);
+          var toRet = Either.<String, Void>right(null);
+
+          var isPostNull = post == null;
+          var isAuthor = isPostNull ? false : post.author.equals(username);
+
+          if (!isPostNull && isAuthor)
+            u.posts.remove(post.uuid);
+          else if (!isPostNull && !isAuthor)
+            toRet = Either.left("invalid post owner");
+          else
+            toRet = Either.left("unknown post");
+
+          return toRet;
+        });
+  }
+
+  public Either<String, Post> rewinPost(String username, String author, String postUuid) {
+
+    return nullGuard(username, "username")
+        .flatMap(__ -> nullGuard(author, "author"))
+        .flatMap(__ -> nullGuard(postUuid, "postUuid"))
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user " + username) : Either.right(u))
+        .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
+        .flatMap(u -> Either.<String, User>right(network.get(author))
+            .flatMap(a -> a == null ? Either.left("unknown user " + author)
+                : getPost(a.username, postUuid).map(p -> Triple.of(u, a, p))))
+        .flatMap(
+            t -> t.fst().username.equals(t.snd().username) ? Either.left("cannot rewin own post") : Either.right(t))
+        .flatMap(t -> makePost(t.trd().title, t.trd().content, t.fst().username));
   }
 
   public String toJSON() {

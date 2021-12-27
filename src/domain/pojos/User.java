@@ -28,48 +28,48 @@ public class User {
     return instance;
   }
 
-  @Override
-  public String toString() {
+  public String toJSON() {
 
-    var tagsLine = "\"tags\": [\n";
+    var tagsLine = "\"tags\":[";
     tagsLine += this.tags
         .stream()
-        .map(c -> c.toString())
-        .reduce("", (acc, curr) -> acc + ",\n" + curr);
-    tagsLine += "\n]";
+        .map(c -> "\"" + c.toString() + "\"")
+        .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
+    tagsLine += "]";
 
-    var postsLine = "\"posts\": {\n";
+    var postsLine = "\"posts\":{";
     postsLine += this.posts.entrySet()
         .stream()
-        .map(e -> "\"" + e.getKey() + "\": " + e.getValue())
-        .reduce("", (acc, curr) -> acc + ",\n" + curr);
-    postsLine += "\n}";
+        .map(e -> "\"" + e.getKey() + "\":" + e.getValue().toJSON())
+        .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
+    postsLine += "}";
 
-    var followersLine = "\"followers\": [\n";
+    var followersLine = "\"followers\":[";
     synchronized (this.followers) {
       followersLine += this.followers
           .stream()
-          .map(c -> c.toString())
-          .reduce("", (acc, curr) -> acc + ",\n" + curr);
+          .map(c -> "\"" + c.toString() + "\"")
+          .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
     }
-    followersLine += "\n]";
+    followersLine += "]";
 
-    var followingLine = "\"following\": ";
+    var followingLine = "\"following\":[";
     synchronized (this.following) {
       followingLine += this.following
           .stream()
-          .map(c -> c.toString())
-          .reduce("", (acc, curr) -> acc + ",\n" + curr);
+          .map(c -> "\"" + c.toString() + "\"")
+          .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
     }
-    followingLine += "\n]";
+    followingLine += "]";
 
-    return String.join("\n",
+    return String.join("",
         "{",
-        "  \"username\": " + "\"" + this.username + "\"" + ",",
-        "  " + tagsLine + ",",
-        "  " + postsLine + ",",
-        "  " + followersLine + ",",
-        "  " + followingLine,
+        "\"username\":" + "\"" + this.username + "\"" + ",",
+        "\"password\":" + "\"" + this.password + "\"" + ",",
+        tagsLine + ",",
+        postsLine + ",",
+        followersLine + ",",
+        followingLine,
         "}");
   }
 }

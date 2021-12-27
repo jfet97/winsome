@@ -29,36 +29,35 @@ public class Post {
     return instance;
   }
 
-  @Override
-  public String toString() {
+  public String toJSON() {
 
-    var commentsLine = "\"comments\": [\n";
+    var commentsLine = "\"comments\":[";
     synchronized (this.comments) {
       commentsLine += this.comments
           .stream()
-          .map(c -> c.toString())
-          .reduce("", (acc, curr) -> acc + ",\n" + curr);
+          .map(c -> c.toJSON())
+          .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
     }
-    commentsLine += "\n]";
+    commentsLine += "]";
 
-    var reactionsLine = "\"reactions\": ";
+    var reactionsLine = "\"reactions\":[";
     synchronized (this.reactions) {
       reactionsLine += this.reactions
           .stream()
-          .map(c -> c.toString())
-          .reduce("", (acc, curr) -> acc + ",\n" + curr);
+          .map(c -> c.toJSON())
+          .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
     }
-    reactionsLine += "\n]";
+    reactionsLine += "]";
 
-    return String.join("\n",
+    return String.join("",
         "{",
-        "  \"uuid\": " + "\"" + this.uuid + "\"" + ",",
-        "  \"date\": " + this.date + ",",
-        "  \"title\": " + "\"" + this.title + "\"" + ",",
-        "  \"content\": " + "\"" + this.content + "\"" + ",",
-        "  \"author\": " + "\"" + this.author + "\"" + ",",
-        "  " + commentsLine + ",",
-        "  " + reactionsLine,
+        "\"uuid\":" + "\"" + this.uuid + "\"" + ",",
+        "\"date\":" + this.date + ",",
+        "\"title\":" + "\"" + this.title + "\"" + ",",
+        "\"content\":" + "\"" + this.content + "\"" + ",",
+        "\"author\":" + "\"" + this.author + "\"" + ",",
+        commentsLine + ",",
+        reactionsLine,
         "}");
   }
 }

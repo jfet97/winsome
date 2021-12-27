@@ -2,8 +2,10 @@ package winsome;
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -22,6 +24,13 @@ public class Winsome {
 
   private final ConcurrentMap<String, User> network = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, Boolean> loggedUsers = new ConcurrentHashMap<>();
+
+  public Map<String, User> getNetwork() {
+    return Collections.unmodifiableMap(this.network);
+  }
+  public Map<String, Boolean> getLoggedUsers() {
+    return Collections.unmodifiableMap(this.loggedUsers);
+  }
 
   /**
    * private void test() {
@@ -101,27 +110,27 @@ public class Winsome {
         });
   }
 
-  @Override
-  public String toString() {
+  public String toJSON() {
+ 
 
-    var networkLine = "\"network\": {\n";
+    var networkLine = "\"network\":{";
     networkLine += this.network.entrySet()
         .stream()
-        .map(e -> "\"" + e.getKey() + "\": " + e.getValue())
-        .reduce("", (acc, curr) -> acc + ",\n" + curr);
-    networkLine += "\n}";
+        .map(e -> "\"" + e.getKey() + "\":" + e.getValue().toJSON())
+        .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
+    networkLine += "}";
 
-    var loggedUsersLine = "\"loggedUsers\": {\n";
+    var loggedUsersLine = "\"loggedUsers\":{";
     loggedUsersLine += this.loggedUsers.entrySet()
         .stream()
-        .map(e -> "\"" + e.getKey() + "\": " + e.getValue())
-        .reduce("", (acc, curr) -> acc + ",\n" + curr);
-    loggedUsersLine += "\n}";
+        .map(e -> "\"" + e.getKey() + "\":" + e.getValue())
+        .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
+    loggedUsersLine += "}";
 
-    return String.join("\n",
+    return String.join("",
         "{",
-        "  " + networkLine + ",",
-        "  " + loggedUsersLine,
+        networkLine + ",",
+        loggedUsersLine,
         "}");
   }
 

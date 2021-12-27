@@ -20,15 +20,14 @@ public class Reaction {
     return instance;
   }
 
-  @Override
-  public String toString() {
+  public String toJSON() {
 
-    return String.join("\n",
+    return String.join("",
         "{",
-        "  \"isUpvote\": " + this.isUpvote + ",",
-        "  \"date\": " + this.date + ",",
-        "  \"postUuid\": " + "\"" + this.postUuid + "\"" + ",",
-        "  \"username\": " + "\"" + this.username + "\"",
+        "\"isUpvote\":" + this.isUpvote + ",",
+        "\"date\":" + this.date + ",",
+        "\"postUuid\":" + "\"" + this.postUuid + "\"" + ",",
+        "\"username\":" + "\"" + this.username + "\"",
         "}");
   }
 }

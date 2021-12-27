@@ -20,15 +20,14 @@ public class Comment {
     return instance;
   }
 
-  @Override
-  public String toString() {
+  public String toJSON() {
 
-    return String.join("\n",
+    return String.join("",
         "{",
-        "  \"text\": " + "\"" + this.text + "\"" + ",",
-        "  \"date\": " + this.date + ",",
-        "  \"postUuid\": " + "\"" + this.postUuid + "\"" + ",",
-        "  \"username\": " + "\"" + this.username + "\"",
+        "\"text\":" + "\"" + this.text + "\"" + ",",
+        "  \"date\":" + this.date + ",",
+        "  \"postUuid\":" + "\"" + this.postUuid + "\"" + ",",
+        "  \"username\":" + "\"" + this.username + "\"",
         "}");
   }
 }

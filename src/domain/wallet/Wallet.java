@@ -1,4 +1,4 @@
-package domain.pojos.wallet;
+package domain.wallet;
 
 import java.util.Collections;
 import java.util.LinkedList;
@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import domain.factories.WalletTransactionFactory;
 import io.vavr.control.Either;
 
 public class Wallet {

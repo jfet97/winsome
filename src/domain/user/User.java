@@ -1,4 +1,4 @@
-package domain.pojos;
+package domain.user;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import domain.post.Post;
 import utils.HashPassword;
 
 public class User {

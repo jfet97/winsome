@@ -1,6 +1,5 @@
-package domain.factories;
+package domain.comment;
 
-import domain.pojos.Comment;
 import io.vavr.collection.Seq;
 import io.vavr.control.Validation;
 

@@ -1,4 +1,4 @@
-package domain.factories.tests;
+package domain.post.tests;
 
 import static org.junit.Assert.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -11,7 +11,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-import domain.factories.PostFactory;
+import domain.post.Post;
+import domain.post.PostFactory;
 
 public class PostFactoryTest {
 

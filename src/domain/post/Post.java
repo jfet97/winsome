@@ -1,9 +1,12 @@
-package domain.pojos;
+package domain.post;
 
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
+
+import domain.comment.Comment;
+import domain.reaction.Reaction;
 
 public class Post {
   public String uuid;

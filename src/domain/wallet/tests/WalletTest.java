@@ -1,4 +1,4 @@
-package domain.pojos.wallet.tests;
+package domain.wallet.tests;
 
 import static org.junit.Assert.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -12,7 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.jupiter.api.Test;
 
-import domain.pojos.wallet.Wallet;
+import domain.wallet.Wallet;
 
 public class WalletTest {
   @Test

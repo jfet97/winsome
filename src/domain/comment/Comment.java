@@ -1,4 +1,4 @@
-package domain.pojos;
+package domain.comment;
 
 import java.util.Date;
 

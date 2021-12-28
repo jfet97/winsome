@@ -1,6 +1,5 @@
-package domain.factories;
+package domain.wallet;
 
-import domain.pojos.wallet.WalletTransaction;
 import io.vavr.control.Validation;
 
 public class WalletTransactionFactory {

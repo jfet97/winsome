@@ -13,11 +13,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.jupiter.api.Test;
 
-import domain.pojos.Comment;
-import domain.pojos.Post;
-import domain.pojos.Reaction;
-import domain.pojos.User;
-import domain.pojos.wallet.Wallet;
+import domain.comment.Comment;
+import domain.post.Post;
+import domain.reaction.Reaction;
+import domain.user.User;
+import domain.wallet.Wallet;
 import winsome.Winsome;
 
 public class WinsomeToJsonTest {

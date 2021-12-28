@@ -1,4 +1,4 @@
-package domain.pojos.wallet;
+package domain.wallet;
 
 import java.util.Date;
 

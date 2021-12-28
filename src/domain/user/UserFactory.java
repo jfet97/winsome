@@ -1,6 +1,5 @@
-package domain.factories;
+package domain.user;
 
-import domain.pojos.User;
 import io.vavr.collection.Seq;
 import io.vavr.control.Validation;
 

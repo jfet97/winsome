@@ -1,4 +1,4 @@
-package domain.pojos;
+package domain.error;
 
 public class Error {
 

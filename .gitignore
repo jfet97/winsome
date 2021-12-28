@@ -2,3 +2,4 @@
 bin
 **/tests/*.json
 .DS_Store
+*.mp4

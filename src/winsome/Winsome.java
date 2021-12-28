@@ -286,7 +286,7 @@ public class Winsome {
         .map(p -> p);
   }
 
-  public Either<String, Void> deletePost(String username, String postUuid) {
+  public Either<String, Post> deletePost(String username, String postUuid) {
 
     return nullGuard(username, "username")
         .flatMap(__ -> nullGuard(postUuid, "postUuid"))
@@ -295,15 +295,10 @@ public class Winsome {
         .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
         .flatMap(u -> {
           var post = u.posts.get(postUuid);
-          var toRet = Either.<String, Void>right(null);
+          var toRet = Either.<String, Post>right(post);
 
-          var isPostNull = post == null;
-          var isAuthor = isPostNull ? false : post.author.equals(username);
-
-          if (!isPostNull && isAuthor)
+          if (post != null)
             u.posts.remove(post.uuid);
-          else if (!isPostNull && !isAuthor)
-            toRet = Either.left("invalid post owner");
           else
             toRet = Either.left("unknown post");
 

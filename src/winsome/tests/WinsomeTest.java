@@ -79,6 +79,10 @@ public class WinsomeTest {
                     });
               }))
           .flatMap(__ -> sleep(1000L))
+          .flatMap(__ -> winsome.createPost(username, "Topolino sucks", "Change my mind"))
+          .flatMap(__ -> winsome.createPost(username, "Topolino sucks", "Change my mind"))
+          .flatMap(p -> winsome.deletePost(username, p.uuid))
+          .flatMap(__ -> sleep(1000L))
           .flatMap(__ -> winsome.logout(username))
           .swap()
           .forEach(System.out::println);
@@ -125,6 +129,9 @@ public class WinsomeTest {
                       return sleep(0L);
                     });
               }))
+          .flatMap(__ -> sleep(9500L))
+          .flatMap(__ -> winsome.createPost(username, "Nature",
+              "I am sitting on my balcony. It is spring and there is a little bit of heat in the sun. The balcony looks out over a road. The road is usually busy… an endless stream of trucks and cars but right now there is no traffic. Everyone is self-isolating. The machine has stopped. It feels strange. Peaceful. I can hear different birds… the wren, the blackbird, the robin. A blue tit is flitting from one branch to the next. Life goes on. I could sit here all day."))
           .flatMap(__ -> sleep(1000L))
           .flatMap(__ -> winsome.logout(username))
           .swap()
@@ -160,8 +167,14 @@ public class WinsomeTest {
             // expected Daniel's post
             assertTrue(ps.isEmpty() == false);
             var p = ps.get(0);
+
             return winsome
-                .addComment(username, p.author, p.uuid, "It sucks Daniel")
+                .deletePost(username, p.uuid)
+                .recover(e -> {
+                  System.out.println(e);
+                  return p;
+                })
+                .flatMap(__ -> winsome.addComment(username, p.author, p.uuid, "It sucks Daniel"))
                 .flatMap(__ -> winsome.ratePost(username, p.author, p.uuid, false))
                 .flatMap(__ -> winsome.unfollowUser(username, "Daniel"))
                 .flatMap(__ -> winsome.rewinPost(username, p.author, p.uuid))
@@ -199,7 +212,7 @@ public class WinsomeTest {
     user2.join();
     user3.join();
 
-    Thread.sleep(1000); // update persistence json file
+    Thread.sleep(3000); // persistence + wallet
     walletThread.interrupt();
     persistenceThread.interrupt();
 

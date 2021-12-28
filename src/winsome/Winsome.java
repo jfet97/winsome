@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
@@ -351,7 +352,7 @@ public class Winsome {
 
                   if (!u.following.contains(a.username))
                     toRet = Either.left("cannot rate post not in feed");
-                  else if (p.reactions.stream().anyMatch(r -> r.username.equals(u.username)))
+                  else if (p.reactions.stream().anyMatch(r -> r.author.equals(u.username)))
                     toRet = Either.left("cannot rate a post twice");
                   else
                     toRet = ReactionFactory.create(isUpvote, p.uuid, u.username)
@@ -429,8 +430,8 @@ public class Winsome {
               interrupted = true;
 
               // does not matter if the file does not exist
-              var newSnapshot = new File(path + ".temp");
-              newSnapshot.delete();
+              // var tempSnapshot = new File(path + ".temp");
+              // tempSnapshot.delete();
             } catch (Exception e) {
               e.printStackTrace();
             }
@@ -463,9 +464,11 @@ public class Winsome {
 
                 var reactions = post.reactions
                     .stream()
-                    .filter(r -> r.timestamp >= this.wallet.prevTimestamp && r.timestamp < nowTimestamp.value);
+                    .filter(r -> r.timestamp >= this.wallet.prevTimestamp && r.timestamp < nowTimestamp.value)
+                    .collect(Collectors.toList());
 
                 var reactionsSum = reactions
+                    .stream()
                     .map(r -> r.isUpvote ? 1 : -1)
                     .reduce(0, (acc, val) -> acc + val);
 
@@ -489,18 +492,28 @@ public class Winsome {
                 var gain = (reactionsContribute + commentsContribute) / post.getWalletScannerIteration();
 
                 var authorGain = (gain / 100) * authorPercentage;
-                var othersGain = ((gain / 100) * (100 - authorPercentage)) / commentsByOtherUsers.size();
+
+                var otherUsers = Stream.concat(
+                    reactions
+                        .stream()
+                        .map(r -> r.author),
+                    commentsByOtherUsers
+                        .stream()
+                        .map(ce -> ce.getKey()))
+                    .distinct()
+                    .collect(Collectors.toList());
+
+                var othersGain = ((gain / 100) * (100 - authorPercentage)) / otherUsers.size();
 
                 this.wallet
                     .addTransaction(post.author, authorGain)
                     .swap()
                     .forEach(System.out::println);
 
-                commentsByOtherUsers
+                otherUsers
                     .stream()
-                    .map(ce -> ce.getKey())
-                    .forEach(ou -> this.wallet
-                        .addTransaction(ou, othersGain)
+                    .forEach(u -> this.wallet
+                        .addTransaction(u, othersGain)
                         .swap()
                         .forEach(System.out::println));
 

@@ -32,7 +32,7 @@ public class WinsomeTest {
     var winsome = new Winsome();
 
     var walletThread = new Thread(winsome.makeWalletRunnable(5000L, 70).get());
-    var persistenceThread = new Thread(winsome.makePersistenceRunnable(1000L, "WinsomeTest.json", false).get());
+    var persistenceThread = new Thread(winsome.makePersistenceRunnable(1000L, "/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/winsome/tests/WinsomeTest.json", false).get());
 
     var user1 = new Thread(() -> {
 
@@ -44,11 +44,13 @@ public class WinsomeTest {
           .flatMap(__ -> sleep(1000L))
           .flatMap(__ -> winsome.login(username, password))
           .flatMap(this::tap)
-          .flatMap(__ -> sleep(2000L))
+          .flatMap(__ -> sleep(500L))
           .flatMap(__ -> winsome.createPost(username, "Shared Reference",
               "Some sources highlight that Stream.of(…).collect(…) may have a larger memory and performance footprint than Arrays.asList(). But in almost all cases, it's such a micro-optimization that there is little difference."))
           .flatMap(__ -> sleep(1000L))
-          .flatMap(__ -> winsome.logout(username));
+          .flatMap(__ -> winsome.logout(username))
+          .swap()
+          .forEach(System.out::println);
 
     });
     var user2 = new Thread(() -> {
@@ -70,18 +72,37 @@ public class WinsomeTest {
             return winsome.followUser(username, daniel);
           })
           .flatMap(__ -> sleep(500L))
-          .flatMap(__ ->  winsome.showFeed(username))
-          // show feed
+          .flatMap(__ -> winsome.showFeed(username))
+          .flatMap(ps -> {
+            // expected Daniel's post
+            assertTrue(ps.isEmpty() == false);
+            var p = ps.get(0);
+            return winsome
+                .addComment(username, p.author, p.uuid, "Nice post Daniel")
+                .flatMap(__ -> winsome.ratePost(username, p.author, p.uuid, true));
+          })
           .flatMap(__ -> sleep(1000L))
-          .flatMap(__ -> winsome.logout(username));
+          .flatMap(__ -> winsome.logout(username))
+          .swap()
+          .forEach(System.out::println);
     });
 
-  var user3 = new Thread(() -> {
-  });
+    var user3 = new Thread(() -> {
+    });
 
-  walletThread.start();persistenceThread.start();user1.start();user2.start();user3.start();
+    walletThread.start();
+    persistenceThread.start();
+    user1.start();
+    user2.start();
+    user3.start();
 
-  user1.join();user2.join();user3.join();walletThread.interrupt();persistenceThread.interrupt();
+    user1.join();
+    user2.join();
+    user3.join();
+    walletThread.interrupt();
+    persistenceThread.interrupt();
 
-  walletThread.join();persistenceThread.join();
-}}
+    walletThread.join();
+    persistenceThread.join();
+  }
+}

@@ -3,6 +3,7 @@ package winsome.tests;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
@@ -31,8 +32,9 @@ public class WinsomeTest {
 
     var winsome = new Winsome();
 
-    var walletThread = new Thread(winsome.makeWalletRunnable(5000L, 70).get());
-    var persistenceThread = new Thread(winsome.makePersistenceRunnable(1000L, "/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/winsome/tests/WinsomeTest.json", false).get());
+    var walletThread = new Thread(winsome.makeWalletRunnable(2000L, 70).get());
+    var persistenceThread = new Thread(winsome.makePersistenceRunnable(1000L,
+        "/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/winsome/tests/WinsomeTest.json", false).get());
 
     var user1 = new Thread(() -> {
 
@@ -63,7 +65,7 @@ public class WinsomeTest {
           .flatMap(__ -> sleep(500L))
           .flatMap(__ -> winsome.login(username, password))
           .flatMap(this::tap)
-          .flatMap(__ -> sleep(3000L))
+          .flatMap(__ -> sleep(2000L))
           .flatMap(__ -> winsome.listUsers(username))
           .flatMap(us -> {
             // expected Daniel inside us because there is a common tag: music
@@ -88,6 +90,42 @@ public class WinsomeTest {
     });
 
     var user3 = new Thread(() -> {
+
+      var username = "Topolino";
+      var password = "Hackerino";
+
+      winsome
+          .register(username, password, Arrays.asList("music", "love"))
+          .flatMap(__ -> sleep(500L))
+          .flatMap(__ -> winsome.login(username, password))
+          .flatMap(this::tap)
+          .flatMap(__ -> sleep(3000L))
+          .flatMap(__ -> winsome.listUsers(username))
+          .flatMap(us -> {
+            // expected Mary and Daniel inside us because there is a common tag: music
+            assertTrue(us.isEmpty() == false);
+
+            return Either
+                .sequenceRight(
+                    us.stream()
+                        .map(u -> winsome.followUser(username, u))
+                        .collect(Collectors.toList()));
+
+          })
+          .flatMap(__ -> sleep(5000L))
+          .flatMap(__ -> winsome.showFeed(username))
+          .flatMap(ps -> {
+            // expected Daniel's post
+            assertTrue(ps.isEmpty() == false);
+            var p = ps.get(0);
+            return winsome
+                .addComment(username, p.author, p.uuid, "It sucks Daniel")
+                .flatMap(__ -> winsome.ratePost(username, p.author, p.uuid, false));
+          })
+          .flatMap(__ -> sleep(3000L))
+          .flatMap(__ -> winsome.logout(username))
+          .swap()
+          .forEach(System.out::println);
     });
 
     walletThread.start();

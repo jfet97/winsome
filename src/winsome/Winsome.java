@@ -467,6 +467,11 @@ public class Winsome {
                     .filter(r -> r.timestamp >= this.wallet.prevTimestamp && r.timestamp < nowTimestamp.value)
                     .collect(Collectors.toList());
 
+                var positiveReactions = reactions
+                    .stream()
+                    .filter(r -> r.isUpvote)
+                    .collect(Collectors.toList());
+
                 var reactionsSum = reactions
                     .stream()
                     .map(r -> r.isUpvote ? 1 : -1)
@@ -474,7 +479,7 @@ public class Winsome {
 
                 var reactionsContribute = Math.log(Math.max(reactionsSum, 0) + 1);
 
-                var commentsByOtherUsers = post.comments
+                var comments = post.comments
                     .stream()
                     .filter(c -> c.timestamp >= this.wallet.prevTimestamp && c.timestamp < nowTimestamp.value)
                     .collect(Collectors.groupingBy(c -> c.author))
@@ -482,7 +487,7 @@ public class Winsome {
                     .stream()
                     .collect(Collectors.toList());
 
-                var commentsSum = commentsByOtherUsers
+                var commentsSum = comments
                     .stream()
                     .map(ce -> (double) ce.getValue().size())
                     .reduce(0., (acc, val) -> acc + (2. / (1 + Math.pow(Math.E, -(val.intValue() - 1)))));
@@ -494,21 +499,22 @@ public class Winsome {
                 var authorGain = (gain / 100) * authorPercentage;
 
                 var otherUsers = Stream.concat(
-                    reactions
+                    positiveReactions
                         .stream()
                         .map(r -> r.author),
-                    commentsByOtherUsers
+                    comments
                         .stream()
                         .map(ce -> ce.getKey()))
-                    .distinct()
                     .collect(Collectors.toList());
 
-                var othersGain = ((gain / 100) * (100 - authorPercentage)) / otherUsers.size();
+                var othersGain = ((gain / 100) * (100 - authorPercentage)) / otherUsers.stream().distinct().count();
 
-                this.wallet
-                    .addTransaction(post.author, authorGain)
-                    .swap()
-                    .forEach(System.out::println);
+                if (authorGain != 0) {
+                  this.wallet
+                      .addTransaction(post.author, authorGain)
+                      .swap()
+                      .forEach(System.out::println);
+                }
 
                 otherUsers
                     .stream()
@@ -517,7 +523,9 @@ public class Winsome {
                         .swap()
                         .forEach(System.out::println));
 
-                post.incrementWalletScannerIteration();
+                if (reactions.size() != 0 || comments.size() != 0) {
+                  post.incrementWalletScannerIteration();
+                }
               });
 
               this.wallet.prevTimestamp = nowTimestamp.value;

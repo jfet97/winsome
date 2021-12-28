@@ -77,6 +77,7 @@ public class Wallet {
 
     return String.join("",
         "{",
+        "\"prevTimestamp\":" + prevTimestamp + ",",
         walletLine,
         "}");
   }

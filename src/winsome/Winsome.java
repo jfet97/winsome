@@ -417,8 +417,10 @@ public class Winsome {
               // could be interrupted
               Files.write(Paths.get(path + ".temp"), this.toJSON().getBytes());
 
+              // does not matter if the file does not exist
               var oldSnapshot = new File(path);
               oldSnapshot.delete();
+
               var newSnapshot = new File(path + ".temp");
               newSnapshot.renameTo(new File(path));
 
@@ -442,7 +444,6 @@ public class Winsome {
         .filterOrElse(p -> p >= 0 && p <= 100, p -> p + " is an invalid author percentage")
         .map(__ -> () -> {
           var interrupted = false;
-          var prevTimestamp = Wrapper.of(0L);
           var nowTimestamp = Wrapper.of(0L);
 
           while (!interrupted) {
@@ -462,7 +463,7 @@ public class Winsome {
 
                 var reactions = post.reactions
                     .stream()
-                    .filter(r -> r.timestamp >= prevTimestamp.value && r.timestamp < nowTimestamp.value);
+                    .filter(r -> r.timestamp >= this.wallet.prevTimestamp && r.timestamp < nowTimestamp.value);
 
                 var reactionsSum = reactions
                     .map(r -> r.isUpvote ? 1 : -1)
@@ -472,7 +473,7 @@ public class Winsome {
 
                 var commentsByOtherUsers = post.comments
                     .stream()
-                    .filter(c -> c.timestamp >= prevTimestamp.value && c.timestamp < nowTimestamp.value)
+                    .filter(c -> c.timestamp >= this.wallet.prevTimestamp && c.timestamp < nowTimestamp.value)
                     .collect(Collectors.groupingBy(c -> c.author))
                     .entrySet()
                     .stream();
@@ -503,7 +504,7 @@ public class Winsome {
                 post.incrementWalletScannerIteration();
               });
 
-              prevTimestamp.value = nowTimestamp.value;
+              this.wallet.prevTimestamp = nowTimestamp.value;
 
               Thread.sleep(interval);
             } catch (InterruptedException e) {

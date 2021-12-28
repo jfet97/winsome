@@ -1,6 +1,7 @@
 package domain.wallet;
 
 import java.util.Collections;
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,8 @@ public class Wallet {
 
   // ConcurrentMap<username, transactions>
   private final ConcurrentMap<String, List<WalletTransaction>> wallet = new ConcurrentHashMap<>();
+
+  public Long prevTimestamp = new Date().getTime();
 
   public static Wallet of() {
     return new Wallet();

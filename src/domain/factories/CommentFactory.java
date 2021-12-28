@@ -10,13 +10,13 @@ public class CommentFactory {
   }
 
   private static interface CommentValidator {
-    public Validation<Seq<String>, Comment> validateComment(String text, String postUuid, String username);
+    public Validation<Seq<String>, Comment> validateComment(String text, String postUuid, String author);
   }
 
   private static CommentValidator validator = new CommentValidator() {
     @Override
-    public Validation<Seq<String>, Comment> validateComment(String text, String postUuid, String username) {
-      return Validation.combine(validateText(text), validatePostUuid(postUuid), validateUsername(username)).ap(Comment::of);
+    public Validation<Seq<String>, Comment> validateComment(String text, String postUuid, String author) {
+      return Validation.combine(validateText(text), validatePostUuid(postUuid), validateUsername(author)).ap(Comment::of);
     }
 
     private Validation<String, String> validateText(String text) {
@@ -43,21 +43,21 @@ public class CommentFactory {
       return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(postUuidTrimmed);
     }
 
-    private Validation<String, String> validateUsername(String username) {
+    private Validation<String, String> validateUsername(String author) {
       var errorMessage = "";
-      var usernameTrimmed = username != null ? username.trim() : null;
+      var authorTrimmed = author != null ? author.trim() : null;
 
-      if (usernameTrimmed == null)
-        errorMessage = "username cannot be null";
-      else if (usernameTrimmed.equals(""))
-        errorMessage = "username cannot be empty";
+      if (authorTrimmed == null)
+        errorMessage = "author cannot be null";
+      else if (authorTrimmed.equals(""))
+        errorMessage = "author cannot be empty";
 
-      return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(usernameTrimmed);
+      return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(authorTrimmed);
     }
 
   };
 
-  public static Validation<Seq<String>, Comment> create(String text, String postUuid, String username) {
-    return validator.validateComment(text, postUuid, username);
+  public static Validation<Seq<String>, Comment> create(String text, String postUuid, String author) {
+    return validator.validateComment(text, postUuid, author);
   }
 }

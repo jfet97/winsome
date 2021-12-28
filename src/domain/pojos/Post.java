@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public class Post {
   public String uuid;
-  public Long date;
+  public Long timestamp;
   public String title;
   public String content;
   public String author;
@@ -20,7 +20,7 @@ public class Post {
     var instance = new Post();
 
     instance.uuid = UUID.randomUUID().toString(); // readonly
-    instance.date = new Date().getTime(); // readonly
+    instance.timestamp = new Date().getTime(); // readonly
     instance.title = title; // readonly
     instance.content = content; // readonly
     instance.author = author; // readonly
@@ -80,7 +80,7 @@ public class Post {
     return String.join("",
         "{",
         "\"uuid\":" + "\"" + this.uuid + "\"" + ",",
-        "\"date\":" + this.date + ",",
+        "\"timestamp\":" + this.timestamp + ",",
         "\"title\":" + "\"" + this.title + "\"" + ",",
         "\"content\":" + "\"" + this.content + "\"" + ",",
         "\"author\":" + "\"" + this.author + "\"" + ",",

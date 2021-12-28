@@ -1,5 +1,8 @@
 package winsome;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
@@ -28,21 +31,18 @@ import secrets.Secrets;
 import utils.HashPassword;
 import utils.Pair;
 import utils.Triple;
+import utils.Wrapper;
 
 public class Winsome {
 
+  @JsonProperty("network")
   private final ConcurrentMap<String, User> network = new ConcurrentHashMap<>();
+  @JsonProperty("loggedUsers")
   private final ConcurrentMap<String, Boolean> loggedUsers = new ConcurrentHashMap<>();
   @JsonProperty("wallet")
   private final Wallet wallet = Wallet.of();
 
-  public Map<String, User> getNetwork() {
-    return Collections.unmodifiableMap(this.network);
-  }
-
-  public Map<String, Boolean> getLoggedUsers() {
-    return Collections.unmodifiableMap(this.loggedUsers);
-  }
+  // internals
 
   private <T> Either<String, T> nullGuard(T x, String name) {
     if (x == null) {
@@ -365,7 +365,7 @@ public class Winsome {
             });
   }
 
-  public Either<String, Comment> ratePost(String username, String author, String postUuid, String text) {
+  public Either<String, Comment> addComment(String username, String author, String postUuid, String text) {
     return nullGuard(username, "username")
         .flatMap(__ -> nullGuard(author, "author"))
         .flatMap(__ -> nullGuard(postUuid, "postUuid"))
@@ -402,6 +402,104 @@ public class Winsome {
                 }
               }
             });
+  }
+
+  public Either<String, Runnable> makePersistenceRunnable(Long interval, String path, Boolean minify) {
+    return nullGuard(interval, "interval")
+        .flatMap(__ -> nullGuard(path, "path"))
+        .flatMap(__ -> nullGuard(minify, "minify"))
+        .map(__ -> () -> {
+          var interrupted = false;
+          while (!interrupted) {
+            try {
+              Files.write(Paths.get(path), this.toJSON().getBytes());
+              Thread.sleep(interval);
+            } catch (InterruptedException e) {
+              interrupted = true;
+            } catch (Exception e) {
+              e.printStackTrace();
+            }
+          }
+        });
+  }
+
+  public Either<String, Runnable> makeWalletRunnable(Long interval, Integer authorPercentage) {
+    return nullGuard(interval, "interval")
+        .flatMap(__ -> nullGuard(authorPercentage, "authorPercentage"))
+        .filterOrElse(p -> p >= 0 && p <= 100, p -> p + " is an invalid author percentage")
+        .map(__ -> () -> {
+          var interrupted = false;
+          var prevTimestamp = Wrapper.of(0L);
+          var nowTimestamp = Wrapper.of(0L);
+
+          while (!interrupted) {
+            try {
+
+              nowTimestamp.value = new Date().getTime();
+
+              var posts = this.network
+                  .entrySet()
+                  .stream()
+                  .flatMap(ne -> ne.getValue().posts
+                      .entrySet()
+                      .stream()
+                      .map(ue -> ue.getValue()));
+
+              posts.forEach(post -> {
+
+                var reactions = post.reactions
+                    .stream()
+                    .filter(r -> r.timestamp >= prevTimestamp.value && r.timestamp < nowTimestamp.value);
+
+                var reactionsSum = reactions
+                    .map(r -> r.isUpvote ? 1 : -1)
+                    .reduce(0, (acc, val) -> acc + val);
+
+                var reactionsContribute = Math.log(Math.max(reactionsSum, 0) + 1);
+
+                var commentsByOtherUsers = post.comments
+                    .stream()
+                    .filter(c -> c.timestamp >= prevTimestamp.value && c.timestamp < nowTimestamp.value)
+                    .collect(Collectors.groupingBy(c -> c.author))
+                    .entrySet()
+                    .stream();
+
+                var commentsSum = commentsByOtherUsers
+                    .map(ce -> (double) ce.getValue().size())
+                    .reduce(0., (acc, val) -> acc + (2. / (1 + Math.pow(Math.E, -(val.intValue() - 1)))));
+
+                var commentsContribute = Math.log(commentsSum + 1);
+
+                var gain = (reactionsContribute + commentsContribute) / post.getWalletScannerIteration();
+
+                var authorGain = (gain / 100) * authorPercentage;
+                var othersGain = ((gain / 100) * (100 - authorPercentage)) / commentsByOtherUsers.count();
+
+                this.wallet
+                    .addTransaction(post.author, authorGain)
+                    .swap()
+                    .forEach(System.out::println);
+
+                commentsByOtherUsers
+                    .map(ce -> ce.getKey())
+                    .forEach(ou -> this.wallet
+                        .addTransaction(ou, othersGain)
+                        .swap()
+                        .forEach(System.out::println));
+
+                post.incrementWalletScannerIteration();
+              });
+
+              prevTimestamp.value = nowTimestamp.value;
+
+              Thread.sleep(interval);
+            } catch (InterruptedException e) {
+              interrupted = true;
+            } catch (Exception e) {
+              e.printStackTrace();
+            }
+          }
+        });
   }
 
   public String toJSON() {

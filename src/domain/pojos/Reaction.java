@@ -3,7 +3,7 @@ package domain.pojos;
 import java.util.Date;
 
 public class Reaction {
-  public Long date;
+  public Long timestamp;
   public Boolean isUpvote; // true for upvotes, false for downvotes
   public String postUuid;
   public String username;
@@ -13,7 +13,7 @@ public class Reaction {
     var instance = new Reaction();
 
     instance.isUpvote = isUpvote; // readonly
-    instance.date = new Date().getTime(); // readonly
+    instance.timestamp = new Date().getTime(); // readonly
     instance.postUuid = postUuid; // readonly
     instance.username = username; // readonly
 
@@ -25,7 +25,7 @@ public class Reaction {
     return String.join("",
         "{",
         "\"isUpvote\":" + this.isUpvote + ",",
-        "\"date\":" + this.date + ",",
+        "\"timestamp\":" + this.timestamp + ",",
         "\"postUuid\":" + "\"" + this.postUuid + "\"" + ",",
         "\"username\":" + "\"" + this.username + "\"",
         "}");

@@ -5,11 +5,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Calendar;
+import java.util.Date;
+
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.exceptions.JWTVerificationException;
+
 import org.junit.jupiter.api.Test;
 
+import domain.user.User;
 import http.HttpRequest;
 import http.HttpResponse;
 import jexpress.JExpress;
+import secrets.Secrets;
 import utils.Wrapper;
 
 public class JExpressTest {
@@ -105,10 +114,20 @@ public class JExpressTest {
         .flatMap(req -> req.setHTTPVersion(HttpRequest.HTTPV11))
         .get();
 
+    var algorithm = Algorithm.HMAC256(Secrets.JWT_SIGN_SECRET);
+    var algorithm = Algorithm.HMAC256(Secrets.JWT_SIGN_SECRET + " "); // invalid signature
+    var cal = Calendar.getInstance();
+    cal.setTimeInMillis(new Date().getTime());
+    cal.add(Calendar.DATE, 1);
+    // cal.add(Calendar.DATE, -1); // expected expiration error
+    var jwt = JWT.create()
+        .withExpiresAt(cal.getTime())
+        .withClaim("username", "meulno")
+        .sign(algorithm);
+
     var usersIdRequest = HttpRequest.build("GET")
         .flatMap(req -> req.setRequestTarget("/users/123456"))
-        .flatMap(req -> req.setHeader("Authorization", "Bearer "
-            + "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjaWFvIjoiSW8gbWkgY2hpYW1vIEFuZHJlYSBTaW1vbmUgQ29zdGEifQ.DLVLk4dpKiZQ8DzsteywZY01zuPhJa55Msu3_JwYP-k"))
+        .flatMap(req -> req.setHeader("Authorization", "Bearer " + jwt))
         .flatMap(req -> req.setHTTPVersion(HttpRequest.HTTPV11))
         .get();
 
@@ -150,10 +169,37 @@ public class JExpressTest {
 
     jexpress.use((request, params, reply, next) -> {
 
-      if (request.getHeaders().containsKey("Authorization")) {
+      var token = request.getHeaders().get("Authorization");
+      var error = false;
+
+      try {
+        var verifier = JWT.require(Algorithm.HMAC256(Secrets.JWT_SIGN_SECRET))
+            .withClaimPresence("username")
+            .build(); // Reusable verifier instance
+        var dec = verifier.verify(token.substring(7));
+
+        var usernameClaim = dec.getClaim("username");
+
+        if (usernameClaim.isNull()) {
+          throw new RuntimeException();
+        }
+
+        request.context = User.of(usernameClaim.asString(), "INVALD_USER", null);
+
         // run the next middleware or the route handler only if the user is authorized
         next.run();
-      } else {
+
+      } catch (JWTVerificationException e) {
+        // Invalid signature/claims e.g. token expired
+        // reply accordingly
+        System.out.println(e.getMessage());
+        error = true;
+      } catch (Exception e) {
+        // reply accordingly
+        error = true;
+      }
+
+      if (error) {
         var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_401[0], HttpResponse.CODE_401[1])
             .flatMap(req -> req.setHeader("Server", "nginx/0.8.54"))
             .flatMap(req -> req.setHeader("Date", "02 Jan 2012 02:33:17 GMT"))
@@ -166,6 +212,17 @@ public class JExpressTest {
 
         failedAuthResponseSent.value = true;
       }
+
+      System.out.println("-------------------------------------------\n");
+    });
+
+    jexpress.use((request, params, reply, next) -> {
+      System.out.println("Using context...");
+      var user = (User) request.context;
+
+      assertEquals(user.username, "meulno");
+
+      next.run(); // run the next middleware or the route hander
     });
 
     jexpress.handle(usersRequest);

@@ -14,6 +14,7 @@ public class HttpRequest {
   private String HTTPVersion = "";
   private Map<String, String> headers = new HashMap<String, String>();
   private String body = "";
+  public Object context = null;
 
   private HttpRequest() {
   }

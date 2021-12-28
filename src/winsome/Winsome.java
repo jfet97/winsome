@@ -142,7 +142,6 @@ public class Winsome {
             var jwt = JWT.create()
                 .withExpiresAt(cal.getTime())
                 .withClaim("username", u.username)
-                .withClaim("tags", u.tags)
                 .sign(algorithm);
 
             return Either.right(jwt);

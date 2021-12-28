@@ -16,11 +16,6 @@ import utils.QuadriConsumer;
 
 public class JExpress {
 
-  // TODO: needs a TCP connection to send responses as constructor parameter?
-  // TODO: SPECIFICARE DI prrima aggiungere callback e middlewares, poi gestire le
-  // risorse che le strutture non sono concorrenti
-  // ok perché in handling è tutto in lettura
-
   private final String GET = "GET";
   private final String POST = "POST";
   private final String PUT = "PUT";
@@ -38,7 +33,9 @@ public class JExpress {
     this.routes.put(DELETE, new HashMap<>());
   }
 
+  // -------------------------------------------------
   // middlewares registration
+
   public void use(
       QuadriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>, Runnable> middleware) {
     // add at the end of the list
@@ -81,7 +78,8 @@ public class JExpress {
     this.add(jexpressRoute, DELETE, cb);
   }
 
-  // request handling
+  // -------------------------------------------------
+  // requests handling
 
   private void runMiddlewares(HttpRequest request, Map<String, String> parametersFromPath,
       List<QuadriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>, Runnable>> middlewares,
@@ -106,6 +104,8 @@ public class JExpress {
 
   }
 
+  // this method is thread safe as long as the configuration process has finished
+  // TODO: second parameter, a socket on which write the response
   public void handle(HttpRequest request) {
     if (request != null) {
       // get the handlers based on the request HTTP method
@@ -130,7 +130,8 @@ public class JExpress {
               // first: run middlewares
               runMiddlewares(request, parametersFromPath, this.globalMiddlewares, 0, runRouteHandlers);
 
-              // second: call the route handler only if the last middleware has called the next callback
+              // second: call the route handler only if the last middleware has called the
+              // next callback
               if (runRouteHandlers.value) {
                 handler.accept(request, parametersFromPath, eresponse -> {
                   var response = eresponse.getOrElseGet(err -> HttpResponse

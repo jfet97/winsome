@@ -1,5 +1,6 @@
 package winsome.tests;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -60,12 +61,23 @@ public class WinsomeTest {
           .flatMap(__ -> sleep(8000L))
           .flatMap(__ -> winsome.viewBlog(username))
           .flatMap(ps -> {
-            // espect Daniel own post
+            // expect Daniel own post
             assertFalse(ps.isEmpty());
             assertTrue(ps.get(0).author.equals(username));
             return winsome.showPost(username, username, ps.get(0).uuid);
           })
           .flatMap(p -> tap(p, x -> x.toJSON()))
+          .flatMap(__ -> sleep(5000L))
+          .flatMap(__ -> winsome.listFollowers(username)
+              .flatMap(fs -> {
+                assertTrue(fs.size() == 1);
+                assertEquals(fs.get(0), "Mary");
+                return winsome.listFollowing(username)
+                    .flatMap(fg -> {
+                      assertTrue(fg.size() == 0);
+                      return sleep(0L);
+                    });
+              }))
           .flatMap(__ -> sleep(1000L))
           .flatMap(__ -> winsome.logout(username))
           .swap()
@@ -75,7 +87,7 @@ public class WinsomeTest {
     var user2 = new Thread(() -> {
 
       var username = "Mary";
-      var password = "itsucks";
+      var password = "hello1234";
 
       winsome
           .register(username, password, Arrays.asList("music", "love", "dance", "fruit"))
@@ -98,8 +110,21 @@ public class WinsomeTest {
             var p = ps.get(0);
             return winsome
                 .addComment(username, p.author, p.uuid, "Nice post Daniel")
-                .flatMap(__ -> winsome.ratePost(username, p.author, p.uuid, true));
+                .flatMap(__ -> winsome.ratePost(username, p.author, p.uuid, true))
+                .flatMap(__ -> winsome.rewinPost(username, p.author, p.uuid));
           })
+          .flatMap(__ -> sleep(3000L))
+          .flatMap(__ -> winsome.listFollowers(username)
+              .flatMap(fs -> {
+                assertTrue(fs.size() == 1);
+                assertEquals(fs.get(0), "Topolino");
+                return winsome.listFollowing(username)
+                    .flatMap(fg -> {
+                      assertTrue(fg.size() == 1);
+                      assertEquals(fg.get(0), "Daniel");
+                      return sleep(0L);
+                    });
+              }))
           .flatMap(__ -> sleep(1000L))
           .flatMap(__ -> winsome.logout(username))
           .swap()
@@ -137,9 +162,25 @@ public class WinsomeTest {
             var p = ps.get(0);
             return winsome
                 .addComment(username, p.author, p.uuid, "It sucks Daniel")
-                .flatMap(__ -> winsome.ratePost(username, p.author, p.uuid, false));
+                .flatMap(__ -> winsome.ratePost(username, p.author, p.uuid, false))
+                .flatMap(__ -> winsome.unfollowUser(username, "Daniel"))
+                .flatMap(__ -> winsome.rewinPost(username, p.author, p.uuid))
+                .recover(e -> {
+                  System.out.println(e);
+                  return p;
+                });
           })
-          .flatMap(__ -> winsome.unfollowUser(username, "Daniel"))
+          .flatMap(__ -> sleep(500L))
+          .flatMap(__ -> winsome.listFollowers(username)
+              .flatMap(fs -> {
+                assertTrue(fs.size() == 0);
+                return winsome.listFollowing(username)
+                    .flatMap(fg -> {
+                      assertTrue(fg.size() == 1);
+                      assertEquals(fg.get(0), "Mary");
+                      return sleep(0L);
+                    });
+              }))
           .flatMap(__ -> sleep(3000L))
           .flatMap(__ -> winsome.logout(username))
           // .flatMap(__ -> winsome.unfollowUser(username, "Daniel")) // user Topolino is

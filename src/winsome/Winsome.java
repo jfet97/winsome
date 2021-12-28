@@ -324,6 +324,17 @@ public class Winsome {
                 : getPost(a.username, postUuid).map(p -> Triple.of(u, a, p))))
         .flatMap(
             t -> t.fst().username.equals(t.snd().username) ? Either.left("cannot rewin own post") : Either.right(t))
+        .flatMap(t -> {
+          var u = t.fst();
+          var a = t.snd();
+
+          synchronized (u.following) {
+            if (!u.following.contains(a.username))
+              return Either.left("cannot rewin post not in feed");
+            else
+              return Either.right(t);
+          }
+        })
         .flatMap(t -> makePost(t.fst().username, t.trd().title, t.trd().content));
   }
 
@@ -392,7 +403,7 @@ public class Winsome {
                   var toRet = Either.<String, Comment>right(null);
 
                   if (!u.following.contains(a.username))
-                    toRet = Either.left("cannot rate post not in feed");
+                    toRet = Either.left("cannot comment post not in feed");
                   else
                     toRet = CommentFactory.create(text, postUuid, u.username)
                         .toEither()

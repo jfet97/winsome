@@ -132,6 +132,12 @@ public class WinsomeTest {
           .flatMap(__ -> sleep(9500L))
           .flatMap(__ -> winsome.createPost(username, "Nature",
               "I am sitting on my balcony. It is spring and there is a little bit of heat in the sun. The balcony looks out over a road. The road is usually busy… an endless stream of trucks and cars but right now there is no traffic. Everyone is self-isolating. The machine has stopped. It feels strange. Peaceful. I can hear different birds… the wren, the blackbird, the robin. A blue tit is flitting from one branch to the next. Life goes on. I could sit here all day."))
+          .flatMap(__ -> winsome.getUserWalletInWincoin(username))
+          .map(ws -> "Mary has " + ws + " wincoins!")
+          .flatMap(this::tap)
+          .flatMap(__ -> winsome.getUserWalletInBitcoin(username))
+          .map(bs -> "Mary could have " + bs + " bitcoins!")
+          .flatMap(this::tap)
           .flatMap(__ -> sleep(1000L))
           .flatMap(__ -> winsome.logout(username))
           .swap()

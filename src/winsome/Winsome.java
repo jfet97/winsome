@@ -1,6 +1,11 @@
 package winsome;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -29,6 +34,7 @@ import domain.reaction.ReactionFactory;
 import domain.user.User;
 import domain.user.UserFactory;
 import domain.wallet.Wallet;
+import domain.wallet.WalletTransaction;
 import io.vavr.control.Either;
 import secrets.Secrets;
 import utils.HashPassword;
@@ -45,6 +51,7 @@ public class Winsome {
   @JsonProperty("wallet")
   private final Wallet wallet = Wallet.of();
 
+  // ---------------------------------------
   // internals
 
   private <T> Either<String, T> nullGuard(T x, String name) {
@@ -88,6 +95,13 @@ public class Winsome {
             .collect(Collectors.toList()));
   }
 
+  private Either<String, List<WalletTransaction>> getWalletOfUser(String username) {
+    return nullGuard(username, "username")
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .map(u -> this.wallet.getWallet().get(u.username).stream().collect(Collectors.toList()));
+  }
+
+  // ---------------------------------------
   // API
 
   public Either<String, User> register(String username, String password, List<String> tags) {
@@ -410,6 +424,53 @@ public class Winsome {
                 }
               }
             });
+  }
+
+  public Either<String, List<WalletTransaction>> getUserWallet(String username) {
+    return nullGuard(username, "username")
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user " + username) : Either.right(u))
+        .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
+        .flatMap(u -> getWalletOfUser(u.username));
+  }
+
+  public Either<String, Double> getUserWalletInWincoin(String username) {
+    return getUserWallet(username)
+        .map(ts -> ts.stream().map(t -> t.gain).reduce(0., (acc, val) -> acc + val));
+  }
+
+  public Either<String, Double> getUserWalletInBitcoin(String username) {
+    return getUserWalletInWincoin(username)
+        .flatMap(ws -> {
+
+          try {
+
+            var url = new URL("https://www.random.org/decimal-fractions/?num=1&dec=10&col=1&format=plain&rnd=new");
+            var con = (HttpURLConnection) url.openConnection();
+            con.setRequestMethod("GET");
+
+            if (con.getResponseCode() == HttpURLConnection.HTTP_OK) {
+              var reader = new BufferedReader(new InputStreamReader(con.getInputStream()));
+
+              var inputLine = "";
+              var res = new StringBuffer();
+
+              while ((inputLine = reader.readLine()) != null) {
+                res.append(inputLine);
+              }
+              reader.close();
+
+              return Either.right(Double.parseDouble(res.toString()) * ws);
+            } else {
+              throw new RuntimeException("get request to random.org has failed");
+            }
+
+          } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return Either.left("conversion in bitcoin has failed");
+          }
+
+        });
   }
 
   public Either<String, Runnable> makePersistenceRunnable(Long interval, String path, Boolean minify) {

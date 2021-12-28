@@ -250,7 +250,7 @@ public class Winsome {
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
         .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
-        .flatMap(u -> makePost(title, content, u.username));
+        .flatMap(u -> makePost(u.username, title, content));
   }
 
   public Either<String, List<Post>> showFeed(String username) {
@@ -323,7 +323,7 @@ public class Winsome {
                 : getPost(a.username, postUuid).map(p -> Triple.of(u, a, p))))
         .flatMap(
             t -> t.fst().username.equals(t.snd().username) ? Either.left("cannot rewin own post") : Either.right(t))
-        .flatMap(t -> makePost(t.trd().title, t.trd().content, t.fst().username));
+        .flatMap(t -> makePost(t.fst().username, t.trd().title, t.trd().content));
   }
 
   public Either<String, Reaction> ratePost(String username, String author, String postUuid, Boolean isUpvote) {
@@ -476,9 +476,11 @@ public class Winsome {
                     .filter(c -> c.timestamp >= this.wallet.prevTimestamp && c.timestamp < nowTimestamp.value)
                     .collect(Collectors.groupingBy(c -> c.author))
                     .entrySet()
-                    .stream();
+                    .stream()
+                    .collect(Collectors.toList());
 
                 var commentsSum = commentsByOtherUsers
+                    .stream()
                     .map(ce -> (double) ce.getValue().size())
                     .reduce(0., (acc, val) -> acc + (2. / (1 + Math.pow(Math.E, -(val.intValue() - 1)))));
 
@@ -487,7 +489,7 @@ public class Winsome {
                 var gain = (reactionsContribute + commentsContribute) / post.getWalletScannerIteration();
 
                 var authorGain = (gain / 100) * authorPercentage;
-                var othersGain = ((gain / 100) * (100 - authorPercentage)) / commentsByOtherUsers.count();
+                var othersGain = ((gain / 100) * (100 - authorPercentage)) / commentsByOtherUsers.size();
 
                 this.wallet
                     .addTransaction(post.author, authorGain)
@@ -495,6 +497,7 @@ public class Winsome {
                     .forEach(System.out::println);
 
                 commentsByOtherUsers
+                    .stream()
                     .map(ce -> ce.getKey())
                     .forEach(ou -> this.wallet
                         .addTransaction(ou, othersGain)

@@ -83,7 +83,7 @@ public class Winsome {
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .map(u -> u.posts.entrySet()
             .stream()
-            .map(e -> e.getValue().toJSONMinimal())
+            .map(e -> e.getValue().toJSON())
             .collect(Collectors.toList()));
   }
 
@@ -282,7 +282,7 @@ public class Winsome {
         .flatMap(__ -> Either.<String, User>right(network.get(author)))
         .flatMap(a -> a == null ? Either.left("unknown user " + author) : Either.right(a))
         .flatMap(a -> getPost(a.username, postUuid))
-        .map(p -> p.toJSONDetails());
+        .map(p -> p.toJSON());
   }
 
   public Either<String, Void> deletePost(String username, String postUuid) {

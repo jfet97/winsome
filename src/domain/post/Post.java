@@ -5,9 +5,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import domain.comment.Comment;
 import domain.reaction.Reaction;
 
+// ignore 'upvotes' and 'downvotes' that are not actual Post's fields
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Post {
   public String uuid;
   public Long timestamp;
@@ -88,38 +92,10 @@ public class Post {
         "\"content\":" + "\"" + this.content + "\"" + ",",
         "\"author\":" + "\"" + this.author + "\"" + ",",
         "\"walletScannerIteration\":" + "\"" + this.getWalletScannerIteration() + "\"" + ",",
+        "\"upvotes\":" + "\"" + this.getUpvotes() + "\"" + ",",
+        "\"downvotes\":" + "\"" + this.getDownvotes() + "\"" + ",",
         commentsLine + ",",
         reactionsLine,
-        "}");
-  }
-
-  public String toJSONMinimal() {
-    return String.join("",
-        "{",
-        "\"uuid\":" + "\"" + this.uuid + "\"" + ",",
-        "\"title\":" + "\"" + this.title + "\"" + ",",
-        "\"author\":" + "\"" + this.author + "\"",
-        "}");
-  }
-
-  public String toJSONDetails() {
-
-    var commentsLine = "\"comments\":[";
-    synchronized (this.comments) {
-      commentsLine += this.comments
-          .stream()
-          .map(c -> c.toJSON())
-          .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
-    }
-    commentsLine += "]";
-
-    return String.join("",
-        "{",
-        "\"title\":" + "\"" + this.title + "\"" + ",",
-        "\"content\":" + "\"" + this.content + "\"" + ",",
-        "\"upvotes\":" + "\"" + this.getUpvotes() + "\"" + ",",
-        "\"downvotes\":" + "\"" + this.getUpvotes() + "\"" + ",",
-        commentsLine,
         "}");
   }
 }

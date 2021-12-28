@@ -47,7 +47,7 @@ public class WinsomeTest {
           .flatMap(__ -> sleep(2000L))
           .flatMap(__ -> winsome.createPost(username, "Shared Reference",
               "Some sources highlight that Stream.of(…).collect(…) may have a larger memory and performance footprint than Arrays.asList(). But in almost all cases, it's such a micro-optimization that there is little difference."))
-          .flatMap(__ -> sleep(10000L))
+          .flatMap(__ -> sleep(1000L))
           .flatMap(__ -> winsome.logout(username));
 
     });
@@ -72,7 +72,7 @@ public class WinsomeTest {
           .flatMap(__ -> sleep(500L))
           .flatMap(__ ->  winsome.showFeed(username))
           // show feed
-          .flatMap(__ -> sleep(10000L))
+          .flatMap(__ -> sleep(1000L))
           .flatMap(__ -> winsome.logout(username));
     });
 

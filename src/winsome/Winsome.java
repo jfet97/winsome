@@ -1,5 +1,7 @@
 package winsome;
 
+import java.io.File;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -412,10 +414,21 @@ public class Winsome {
           var interrupted = false;
           while (!interrupted) {
             try {
-              Files.write(Paths.get(path), this.toJSON().getBytes());
+              // could be interrupted
+              Files.write(Paths.get(path + ".temp"), this.toJSON().getBytes());
+
+              var oldSnapshot = new File(path);
+              oldSnapshot.delete();
+              var newSnapshot = new File(path + ".temp");
+              newSnapshot.renameTo(new File(path));
+
               Thread.sleep(interval);
             } catch (InterruptedException e) {
               interrupted = true;
+
+              // does not matter if the file does not exist
+              var newSnapshot = new File(path + ".temp");
+              newSnapshot.delete();
             } catch (Exception e) {
               e.printStackTrace();
             }
@@ -527,6 +540,7 @@ public class Winsome {
   }
 
   // static
+
   public static Winsome of() {
     return new Winsome();
   }

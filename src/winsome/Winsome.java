@@ -219,7 +219,7 @@ public class Winsome {
   public Either<String, Void> unfollowUser(String username, String usernameToUnfollow) {
 
     return nullGuard(username, "username")
-        .flatMap(__ -> nullGuard(usernameToUnfollow, "usernameToFollow"))
+        .flatMap(__ -> nullGuard(usernameToUnfollow, "usernameToUnfollow"))
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .flatMap(u -> u == null ? Either.left("unknown user " + username)
             : Either.<String, User>right(network.get(usernameToUnfollow))
@@ -472,13 +472,6 @@ public class Winsome {
                     .filter(r -> r.isUpvote)
                     .collect(Collectors.toList());
 
-                var reactionsSum = reactions
-                    .stream()
-                    .map(r -> r.isUpvote ? 1 : -1)
-                    .reduce(0, (acc, val) -> acc + val);
-
-                var reactionsContribute = Math.log(Math.max(reactionsSum, 0) + 1);
-
                 var comments = post.comments
                     .stream()
                     .filter(c -> c.timestamp >= this.wallet.prevTimestamp && c.timestamp < nowTimestamp.value)
@@ -487,43 +480,49 @@ public class Winsome {
                     .stream()
                     .collect(Collectors.toList());
 
-                var commentsSum = comments
-                    .stream()
-                    .map(ce -> (double) ce.getValue().size())
-                    .reduce(0., (acc, val) -> acc + (2. / (1 + Math.pow(Math.E, -(val.intValue() - 1)))));
+                if (positiveReactions.size() != 0 || comments.size() != 0) {
 
-                var commentsContribute = Math.log(commentsSum + 1);
+                  var reactionsSum = reactions
+                      .stream()
+                      .map(r -> r.isUpvote ? 1 : -1)
+                      .reduce(0, (acc, val) -> acc + val);
 
-                var gain = (reactionsContribute + commentsContribute) / post.getWalletScannerIteration();
+                  var reactionsContribute = Math.log(Math.max(reactionsSum, 0) + 1);
 
-                var authorGain = (gain / 100) * authorPercentage;
+                  var commentsSum = comments
+                      .stream()
+                      .map(ce -> (double) ce.getValue().size())
+                      .reduce(0., (acc, val) -> acc + (2. / (1 + Math.pow(Math.E, -(val.intValue() - 1)))));
 
-                var otherUsers = Stream.concat(
-                    positiveReactions
-                        .stream()
-                        .map(r -> r.author),
-                    comments
-                        .stream()
-                        .map(ce -> ce.getKey()))
-                    .collect(Collectors.toList());
+                  var commentsContribute = Math.log(commentsSum + 1);
 
-                var othersGain = ((gain / 100) * (100 - authorPercentage)) / otherUsers.stream().distinct().count();
+                  var gain = (reactionsContribute + commentsContribute) / post.getWalletScannerIteration();
 
-                if (authorGain != 0) {
+                  var authorGain = (gain / 100) * authorPercentage;
+
+                  var otherUsers = Stream.concat(
+                      positiveReactions
+                          .stream()
+                          .map(r -> r.author),
+                      comments
+                          .stream()
+                          .map(ce -> ce.getKey()))
+                      .collect(Collectors.toList());
+
+                  var othersGain = ((gain / 100) * (100 - authorPercentage)) / otherUsers.stream().distinct().count();
+
                   this.wallet
                       .addTransaction(post.author, authorGain)
                       .swap()
                       .forEach(System.out::println);
-                }
 
-                otherUsers
-                    .stream()
-                    .forEach(u -> this.wallet
-                        .addTransaction(u, othersGain)
-                        .swap()
-                        .forEach(System.out::println));
+                  otherUsers
+                      .stream()
+                      .forEach(u -> this.wallet
+                          .addTransaction(u, othersGain)
+                          .swap()
+                          .forEach(System.out::println));
 
-                if (reactions.size() != 0 || comments.size() != 0) {
                   post.incrementWalletScannerIteration();
                 }
               });

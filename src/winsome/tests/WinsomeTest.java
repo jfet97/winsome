@@ -1,8 +1,10 @@
 package winsome.tests;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
@@ -27,13 +29,19 @@ public class WinsomeTest {
     return Either.right(x);
   }
 
+  private <E, A> Either<E, A> tap(A x, Function<A, String> stringifier) {
+    System.out.println(stringifier.apply(x));
+
+    return Either.right(x);
+  }
+
   @Test
   public void test1() throws InterruptedException {
 
     var winsome = new Winsome();
 
     var walletThread = new Thread(winsome.makeWalletRunnable(2000L, 70).get());
-    var persistenceThread = new Thread(winsome.makePersistenceRunnable(1000L,
+    var persistenceThread = new Thread(winsome.makePersistenceRunnable(500L,
         "/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/winsome/tests/WinsomeTest.json", false).get());
 
     var user1 = new Thread(() -> {
@@ -49,6 +57,15 @@ public class WinsomeTest {
           .flatMap(__ -> sleep(500L))
           .flatMap(__ -> winsome.createPost(username, "Shared Reference",
               "Some sources highlight that Stream.of(…).collect(…) may have a larger memory and performance footprint than Arrays.asList(). But in almost all cases, it's such a micro-optimization that there is little difference."))
+          .flatMap(__ -> sleep(8000L))
+          .flatMap(__ -> winsome.viewBlog(username))
+          .flatMap(ps -> {
+            // espect Daniel own post
+            assertFalse(ps.isEmpty());
+            assertTrue(ps.get(0).author.equals(username));
+            return winsome.showPost(username, username, ps.get(0).uuid);
+          })
+          .flatMap(p -> tap(p, x -> x.toJSON()))
           .flatMap(__ -> sleep(1000L))
           .flatMap(__ -> winsome.logout(username))
           .swap()
@@ -112,7 +129,7 @@ public class WinsomeTest {
                         .collect(Collectors.toList()));
 
           })
-          .flatMap(__ -> sleep(5000L))
+          .flatMap(__ -> sleep(3000L))
           .flatMap(__ -> winsome.showFeed(username))
           .flatMap(ps -> {
             // expected Daniel's post
@@ -122,8 +139,11 @@ public class WinsomeTest {
                 .addComment(username, p.author, p.uuid, "It sucks Daniel")
                 .flatMap(__ -> winsome.ratePost(username, p.author, p.uuid, false));
           })
+          .flatMap(__ -> winsome.unfollowUser(username, "Daniel"))
           .flatMap(__ -> sleep(3000L))
           .flatMap(__ -> winsome.logout(username))
+          // .flatMap(__ -> winsome.unfollowUser(username, "Daniel")) // user Topolino is
+          // not logged
           .swap()
           .forEach(System.out::println);
     });
@@ -137,6 +157,8 @@ public class WinsomeTest {
     user1.join();
     user2.join();
     user3.join();
+
+    Thread.sleep(1000); // update persistence json file
     walletThread.interrupt();
     persistenceThread.interrupt();
 

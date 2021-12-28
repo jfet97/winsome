@@ -526,4 +526,8 @@ public class Winsome {
         "}");
   }
 
+  // static
+  public static Winsome of() {
+    return new Winsome();
+  }
 }

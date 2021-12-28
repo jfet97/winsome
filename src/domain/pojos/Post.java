@@ -84,6 +84,7 @@ public class Post {
         "\"title\":" + "\"" + this.title + "\"" + ",",
         "\"content\":" + "\"" + this.content + "\"" + ",",
         "\"author\":" + "\"" + this.author + "\"" + ",",
+        "\"walletScannerIteration\":" + "\"" + this.getWalletScannerIteration() + "\"" + ",",
         commentsLine + ",",
         reactionsLine,
         "}");
@@ -115,7 +116,6 @@ public class Post {
         "\"content\":" + "\"" + this.content + "\"" + ",",
         "\"upvotes\":" + "\"" + this.getUpvotes() + "\"" + ",",
         "\"downvotes\":" + "\"" + this.getUpvotes() + "\"" + ",",
-        "\"walletScannerIteration\":" + "\"" + this.getWalletScannerIteration() + "\"" + ",",
         commentsLine,
         "}");
   }

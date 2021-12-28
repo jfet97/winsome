@@ -115,7 +115,7 @@ public class JExpressTest {
         .get();
 
     var algorithm = Algorithm.HMAC256(Secrets.JWT_SIGN_SECRET);
-    var algorithm = Algorithm.HMAC256(Secrets.JWT_SIGN_SECRET + " "); // invalid signature
+    // var algorithm = Algorithm.HMAC256(Secrets.JWT_SIGN_SECRET + " "); // invalid signature
     var cal = Calendar.getInstance();
     cal.setTimeInMillis(new Date().getTime());
     cal.add(Calendar.DATE, 1);

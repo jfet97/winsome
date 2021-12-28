@@ -78,12 +78,12 @@ public class Winsome {
         .map(pair -> pair.fst().posts.computeIfAbsent(pair.snd().uuid, __ -> pair.snd()));
   }
 
-  public Either<String, List<String>> viewUserBlog(String username) {
+  public Either<String, List<Post>> viewUserBlog(String username) {
     return nullGuard(username, "username")
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .map(u -> u.posts.entrySet()
             .stream()
-            .map(e -> e.getValue().toJSON())
+            .map(e -> e.getValue())
             .collect(Collectors.toList()));
   }
 
@@ -233,7 +233,7 @@ public class Winsome {
         });
   }
 
-  public Either<String, List<String>> viewBlog(String username) {
+  public Either<String, List<Post>> viewBlog(String username) {
 
     return nullGuard(username, "username")
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
@@ -253,7 +253,7 @@ public class Winsome {
         .flatMap(u -> makePost(title, content, u.username));
   }
 
-  public Either<String, List<String>> showFeed(String username) {
+  public Either<String, List<Post>> showFeed(String username) {
 
     return nullGuard(username, "username")
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
@@ -265,13 +265,13 @@ public class Winsome {
                 .map(u -> viewUserBlog(u))
                 .collect(Collectors.toList()))
             .mapLeft(seq -> seq.mkString("\n"))
-            .map(seq -> seq.fold(new LinkedList<String>(), (acc, curr) -> {
+            .map(seq -> seq.fold(new LinkedList<Post>(), (acc, curr) -> {
               acc.addAll(curr);
               return acc;
             })));
   }
 
-  public Either<String, String> showPost(String username, String author, String postUuid) {
+  public Either<String, Post> showPost(String username, String author, String postUuid) {
 
     return nullGuard(username, "username")
         .flatMap(__ -> nullGuard(author, "author"))
@@ -282,7 +282,7 @@ public class Winsome {
         .flatMap(__ -> Either.<String, User>right(network.get(author)))
         .flatMap(a -> a == null ? Either.left("unknown user " + author) : Either.right(a))
         .flatMap(a -> getPost(a.username, postUuid))
-        .map(p -> p.toJSON());
+        .map(p -> p);
   }
 
   public Either<String, Void> deletePost(String username, String postUuid) {

@@ -21,8 +21,6 @@ public class RequestContext {
     if (res != null) {
       this.response = res;
       this.responseBuffer = ByteBuffer.wrap(res.toString().getBytes());
-      System.out.println(res.toString().getBytes().length + " " + responseBuffer.limit());
-
     }
   }
 

@@ -1,9 +1,6 @@
 package server;
 
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -15,15 +12,19 @@ import domain.constant.Constant;
 import domain.error.Error;
 import http.HttpRequest;
 import http.HttpResponse;
+import io.vavr.control.Either;
 
 public class Server {
   public static void main(String[] args) {
+
+    var port = 12345;
+    var ip = "192.168.1.113";
 
     var server = new Server();
 
     var t = new Thread(() -> {
       try {
-        server.run();
+        server.run(port, ip);
       } catch (Exception e) {
         e.printStackTrace();
       }
@@ -36,8 +37,6 @@ public class Server {
       e.printStackTrace();
     }
   }
-
-  private static final int DEFAULT_PORT = 12345;
 
   public HttpResponse makeBadResponse(String error) {
     var errorJSON = Error.of(error).toJSON();
@@ -86,17 +85,16 @@ public class Server {
     var clientCtx = (RequestContext) key.attachment();
     var client = (SocketChannel) key.channel();
 
+    // something weird has happened
     if (clientCtx.getResponseBuffer().isEmpty()) {
-
       clientCtx.isError = true;
       clientCtx.setResponse(makeServerErrorResponse());
-
     }
 
     var resBuf = clientCtx.getResponseBuffer().get();
 
     if (!resBuf.hasRemaining()) {
-      // for the next request
+      // clean it up for the next request
       clientCtx.clear();
 
       if (clientCtx.isError) {
@@ -111,22 +109,25 @@ public class Server {
     }
   }
 
-  public String searchCRLFx2(RequestContext clientCtx) {
+  public Either<String, Integer> searchCRLFx2(RequestContext clientCtx) {
 
     var error = "";
+    var toRet = -1;
 
-    // the index of the first carriage return if the CR LF CR LF sequence is found
+    // the index of the first carriage return if the CR LF CR LF sequence is present
     var separatorIndex = clientCtx.bufferContains(Constant.CRLFx2Byte);
 
-    // CR LF CR LF sequence found
+    // CR LF CR LF sequence was found
     if (separatorIndex != -1) {
 
+      // parsing of the partial request to extract the Content-Length header
       var ereq = HttpRequest.parse(clientCtx.bufferToString(true));
 
       // invalid http request because parser has failed
       if (ereq.isLeft()) {
         error = "invalid http request: " + ereq.getLeft();
       } else {
+        // get a valid request instance
         var req = ereq.get();
 
         var isGet = req.getMethod().equals("GET");
@@ -138,13 +139,25 @@ public class Server {
           try {
             var contentLength = Integer.parseInt(contentLengthHeader);
 
-            var afterindex = separatorIndex + 4; // skip CR LF CR LF
+            // skip CR LF CR LF
+            var afterindex = separatorIndex + 4;
+            // how many bytes of the request have been read
             var bytesStored = clientCtx.getBufferStoredBytes();
 
-            if (afterindex >= bytesStored) {
-              clientCtx.yetToRead = contentLength;
+            // compute the number of missing bytes to read
+            if (afterindex == bytesStored) {
+              // CR LF CR LF sequence was at the very end of the buffer,
+              // so we have to read the whole body
+              toRet = contentLength;
+            } else if (afterindex < bytesStored) {
+              // CR LF CR LF sequence was not at the end of the buffer,
+              // so we have already read some bytes of the body
+              toRet = contentLength - (bytesStored - afterindex);
             } else {
-              clientCtx.yetToRead = contentLength - (bytesStored - afterindex);
+              // afterindex > bytesStored is impossible because in the
+              // worst case the CR LF CR LF sequence was at the very end
+              // of the buffer, so afterindex would be equal but not greather than bytesStored
+              throw new RuntimeException("the impossible has happened");
             }
           } catch (NumberFormatException e) {
             // string -> int conversion failed
@@ -156,13 +169,21 @@ public class Server {
           // the server does not accept that request
           error = "missing Content-Length header";
         } else {
-          clientCtx.yetToRead = 0;
+          // GET without payload: we have encountered the CR LF CR LF
+          // sequence => we have just read the whole request
+          toRet = 0;
         }
       }
       clientCtx.headersParsed = true;
+    } else {
+      // we haven't read enough bytes of the request yet
     }
 
-    return error;
+    if (error.equals("")) {
+      return Either.right(toRet);
+    } else {
+      return Either.left(error);
+    }
 
   }
 
@@ -192,18 +213,26 @@ public class Server {
     clientCtx.concatBuffer(bufArray, bufDataLen);
 
     if (clientCtx.headersParsed == false) {
-      // "Content-Length" header not yet parsed
-      error = this.searchCRLFx2(clientCtx);
+      // Content-Length header not yet parsed, we are looking for the CR LF CR LF
+      // sequence that divides the last header from the body
+      // We need to extract the Content-Length value to know how long is the body of
+      // the request
+      var eSearchRes = this.searchCRLFx2(clientCtx);
+      if (eSearchRes.isLeft()) {
+        error = eSearchRes.getLeft();
+      } else {
+        clientCtx.yetToRead = eSearchRes.get();
+      }
     } else {
-      // "Content-Length" header already parsed
+      // "Content-Length" header already parsed, just update
+      // how many bytes are missing to read the whole request
       clientCtx.yetToRead -= bufDataLen;
     }
 
     if (!error.equals("")) {
-      // something was wrong with this request
-      // the server has to reply with an appropriate http response to then close the
-      // connection
-
+      // something iswrong with this request
+      // the server has to reply with an appropriate
+      // http response to then close the connection
       clientCtx.isError = true;
       clientCtx.setResponse(makeBadResponse(error));
 
@@ -212,44 +241,45 @@ public class Server {
 
     } else if (clientCtx.yetToRead == 0) {
       // nothing more to read
-
-      // TODO: now create an HttpRequest to be handled by thread pool
+      System.out.println(clientCtx.bufferToString(true));
       var ereq = HttpRequest.parse(clientCtx.bufferToString(true));
 
       if (ereq.isLeft()) {
-        // invalid http request because parser has failed
-
+        // invalid http request because the parser has failed
         clientCtx.isError = true;
         clientCtx.setResponse(makeBadResponse("invalid http request: " + ereq.getLeft()));
 
       } else {
+        // get a valid request instance
         var req = ereq.get();
 
+        // handle using the thread pool
         var res = makeOkResponse(
             "<!DOCTYPE html><html><body><h1>Your request was:</h1></br>" + req.toString()
                 + "</body></html>");
 
         clientCtx.setResponse(res);
+
       }
 
       // deregister OP_READ, register OP_WRITE
       key.interestOps(SelectionKey.OP_WRITE);
+
     } else {
       // we haven't read the whole request yet
+      // and no error has occurred
     }
 
   }
 
-  public void run() throws Exception {
-
-    var port = DEFAULT_PORT;
-    var ip = "192.168.1.113";
+  public void run(int port, String ip) throws Exception {
 
     // set up the server
     try (var serverChannel = ServerSocketChannel.open();
         var selector = Selector.open();
         var serverSocket = serverChannel.socket();) {
 
+      // server config
       var address = new InetSocketAddress(ip, port);
       serverSocket.bind(address);
       serverChannel.configureBlocking(false);
@@ -259,7 +289,7 @@ public class Server {
 
       // shared, fixed buffer between requests
       // (safe because NIO input reading is single-threaded)
-      var buf = ByteBuffer.allocate(16384);
+      var buf = ByteBuffer.allocate(100);
 
       while (true) {
         try {

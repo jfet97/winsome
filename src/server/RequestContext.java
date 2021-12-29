@@ -90,6 +90,7 @@ public class RequestContext {
   }
 
   public void clear() {
+    this.requestBuffer = new byte[128];
     this.head = 0;
     this.yetToRead = -1;
     this.isError = false;

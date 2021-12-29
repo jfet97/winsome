@@ -100,6 +100,7 @@ public class HttpRequest {
         }
 
       } catch (Exception e) {
+        e.printStackTrace();
         errorMessage = "invalid or not supported HTTP request:\n" + e.getMessage();
       }
     }

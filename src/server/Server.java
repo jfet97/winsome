@@ -84,7 +84,7 @@ public class Server {
       // shared, fixed buffer between requests (safe because NIO input reading is
       // single-threaded)
       // var buf = ByteBuffer.allocate(16384);
-      var buf = ByteBuffer.allocate(1);
+      var buf = ByteBuffer.allocate(100);
 
       while (true) {
         try {
@@ -149,11 +149,13 @@ public class Server {
                   // CR LF CR LF sequence found
                   if (separatorIndex != -1) {
 
+                    System.out.println("---------\n" + clientCtx.bufferToString(true) + "\n-----------------\n");
+
                     var ereq = HttpRequest.parse(clientCtx.bufferToString(true));
 
                     // invalid http request because parser has failed
                     if (ereq.isLeft()) {
-                      error = "invalid http request";
+                      error = "invalid http request: " + ereq.getLeft();
                     } else {
                       var req = ereq.get();
 
@@ -216,14 +218,13 @@ public class Server {
                   if (ereq.isLeft()) {
 
                     clientCtx.isError = true;
-                    clientCtx.setResponse(makeBadResponse("invalid http request"));
+                    clientCtx.setResponse(makeBadResponse("invalid http request: " + ereq.getLeft()));
 
                   } else {
                     var req = ereq.get();
 
                     clientCtx.setResponse(makeOkResponse(
-                        "<!DOCTYPE html><html><body><h1>Your request was:</h1></br>" + req.toString()
-                            + "</body></html>"));
+                        "<!DOCTYPE html><html><body><h1>Your request was:</h1></br>" + req.toString() + "</body></html>"));
                   }
 
                   // deregister OP_READ, register OP_WRITE

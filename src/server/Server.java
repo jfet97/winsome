@@ -1,6 +1,9 @@
 package server;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -14,6 +17,18 @@ import http.HttpResponse;
 
 public class Server {
   public static void main(String[] args) {
+
+    // File file = new File("/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/server/out.txt");
+    // // Instantiating the PrintStream class
+    // PrintStream stream;
+    // try {
+    //   stream = new PrintStream(file);
+    //   System.out.println("From now on " + file.getAbsolutePath() + " will be your console");
+    //   System.setOut(stream);
+    // } catch (FileNotFoundException e1) {
+    //   e1.printStackTrace();
+    // }
+
     var server = new Server();
 
     var t = new Thread(() -> {
@@ -149,8 +164,6 @@ public class Server {
                   // CR LF CR LF sequence found
                   if (separatorIndex != -1) {
 
-                    System.out.println("---------\n" + clientCtx.bufferToString(true) + "\n-----------------\n");
-
                     var ereq = HttpRequest.parse(clientCtx.bufferToString(true));
 
                     // invalid http request because parser has failed
@@ -223,8 +236,11 @@ public class Server {
                   } else {
                     var req = ereq.get();
 
-                    clientCtx.setResponse(makeOkResponse(
-                        "<!DOCTYPE html><html><body><h1>Your request was:</h1></br>" + req.toString() + "</body></html>"));
+                    var res = makeOkResponse(
+                        "<!DOCTYPE html><html><body><h1>Your request was:</h1></br>" + req.toString()
+                            + "</body></html>");
+
+                    clientCtx.setResponse(res);
                   }
 
                   // deregister OP_READ, register OP_WRITE

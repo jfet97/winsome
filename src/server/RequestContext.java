@@ -21,6 +21,8 @@ public class RequestContext {
     if (res != null) {
       this.response = res;
       this.responseBuffer = ByteBuffer.wrap(res.toString().getBytes());
+      System.out.println(res.toString().getBytes().length + " " + responseBuffer.limit());
+
     }
   }
 
@@ -44,11 +46,13 @@ public class RequestContext {
   }
 
   public String bufferToString(Boolean useUTF8) {
+
+    var validSubset = Arrays.copyOfRange(requestBuffer, 0, this.head);
     try {
       if (useUTF8) {
-        return new String(requestBuffer, "UTF-8");
+        return new String(validSubset, "UTF-8");
       } else {
-        return new String(requestBuffer);
+        return new String(validSubset);
       }
     } catch (UnsupportedEncodingException e) {
       e.printStackTrace();

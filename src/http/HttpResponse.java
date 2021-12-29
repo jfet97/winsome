@@ -22,13 +22,16 @@ public class HttpResponse {
   public static final String HTTPV20 = "HTTP/2.0";
   public static final String CRLF = "\r\n";
 
-  public static final String[] CODE_200 = {"200", "OK"};
-  public static final String[] CODE_201 = {"201", "Created"};
-  public static final String[] CODE_400 = {"400", "Bad Request"};
-  public static final String[] CODE_401 = {"401", "Unauthorized"};
-  public static final String[] CODE_404 = {"404", "Not Found"};
-  public static final String[] CODE_405 = {"405", "Method Not Allowed"};
-  public static final String[] CODE_500 = {"500", "Internal Server Error"};
+  public static final String[] OK_200 = { "200", "OK" };
+  public static final String[] CREATED_201 = { "201", "Created" };
+  public static final String[] BAD_REQUEST_400 = { "400", "Bad Request" };
+  public static final String[] UNAUTHORIZED_401 = { "401", "Unauthorized" };
+  public static final String[] NOT_FOUND_404 = { "404", "Not Found" };
+  public static final String[] METHOD_NOT_ALLOWED_405 = { "405", "Method Not Allowed" };
+  public static final String[] INTERNAL_SERVER_ERROR_500 = { "500", "Internal Server Error" };
+
+  public static final String MIME_APPLICATION_JSON = "application/json";
+  public static final String MIME_TEXT_PLAIN = "text/plain";
 
   public static Either<String, HttpResponse> build(String HTTPVersion, String statusCode, String reasonPhrase) {
     HttpResponse instance = new HttpResponse();
@@ -168,5 +171,38 @@ public class HttpResponse {
 
   public String getBody() {
     return this.body;
+  }
+
+  // builders
+  private static Either<String, HttpResponse> buildFromCode(String bodyN, String mime, Boolean keepAliveConnection,
+      String[] code) {
+    String body = bodyN != null ? bodyN : "";
+    String bodyLength = body.getBytes().length + "";
+
+    return HttpResponse.build(HttpResponse.HTTPV11, code[0], code[1])
+        .flatMap(r -> r.setHeader("Connection", keepAliveConnection ? "keep-alive" : "close"))
+        .flatMap(r -> r.setHeader("Content-Length", bodyLength))
+        .flatMap(r -> mime != null ? r.setHeader("Content-Type", mime) : Either.right(r))
+        .flatMap(r -> r.setBody(body));
+  }
+
+  public static Either<String, HttpResponse> build200(String bodyN, String mime, Boolean keepAliveConnection) {
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.OK_200);
+  }
+
+  public static Either<String, HttpResponse> build400(String bodyN, String mime, Boolean keepAliveConnection) {
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.BAD_REQUEST_400);
+  }
+
+  public static Either<String, HttpResponse> build404(String bodyN, String mime, Boolean keepAliveConnection) {
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.NOT_FOUND_404);
+  }
+
+  public static Either<String, HttpResponse> build405(String bodyN, String mime, Boolean keepAliveConnection) {
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.METHOD_NOT_ALLOWED_405);
+  }
+
+  public static Either<String, HttpResponse> build500(String bodyN, String mime, Boolean keepAliveConnection) {
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.INTERNAL_SERVER_ERROR_500);
   }
 }

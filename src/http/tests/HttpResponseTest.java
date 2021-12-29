@@ -51,7 +51,7 @@ public class HttpResponseTest {
 
   @Test
   void buildValid200() {
-    var eresponse = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_200[0], HttpResponse.CODE_200[1])
+    var eresponse = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.OK_200[0], HttpResponse.OK_200[1])
         .flatMap(req -> req.setHeader("Server", "nginx/0.8.54"))
         .flatMap(req -> req.setHeader("Date", "02 Jan 2012 02:33:17 GMT"))
         .flatMap(req -> req.setHeader("Content-Type", "text/html"))
@@ -69,7 +69,7 @@ public class HttpResponseTest {
 
   @Test
   void buildValid404() {
-    var eresponse = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_404[0], HttpResponse.CODE_404[1])
+    var eresponse = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.NOT_FOUND_404[0], HttpResponse.NOT_FOUND_404[1])
         .flatMap(req -> req.setHeader("Server", "nginx/0.8.54"))
         .flatMap(req -> req.setHeader("Date", "02 Jan 2012 02:33:17 GMT"))
         .flatMap(req -> req.setHeader("Content-Type", "text/html"))

@@ -41,32 +41,17 @@ public class Server {
 
   private JExpress jexpress = JExpress.of();
 
-  public HttpResponse makeBadResponse(String error) {
-    var errorJSON = Error.of(error).toJSON();
-
-    return HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_400[0], HttpResponse.CODE_400[1])
-        .flatMap(r -> r.setHeader("Connection", "close"))
-        .flatMap(r -> r.setHeader("Content-Length", errorJSON.getBytes().length + ""))
-        .flatMap(r -> r.setBody(errorJSON))
-        .get();
+  public HttpResponse badRequestCloseConnection(String error) {
+    return HttpResponse.build400(Error.of(error).toJSON(), HttpResponse.MIME_APPLICATION_JSON, false).get();
   }
 
-  public HttpResponse makeServerErrorResponse() {
-    var errorJSON = Error.of("INTERNAL SERVER ERROR").toJSON();
-
-    return HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_500[0], HttpResponse.CODE_500[1])
-        .flatMap(r -> r.setHeader("Connection", "close"))
-        .flatMap(r -> r.setHeader("Content-Length", errorJSON.getBytes().length + ""))
-        .flatMap(r -> r.setBody(errorJSON))
-        .get();
+  public HttpResponse internalServerErrorCloseConnection() {
+    return HttpResponse.build500(Error.of(
+        "INTERNAL SERVER ERROR").toJSON(), HttpResponse.MIME_APPLICATION_JSON, false).get();
   }
 
-  public HttpResponse makeOkResponse(String body) {
-    return HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_200[0], HttpResponse.CODE_200[1])
-        .flatMap(r -> r.setHeader("Connection", "keep-alive"))
-        .flatMap(r -> r.setHeader("Content-Length", body.getBytes().length + ""))
-        .flatMap(r -> r.setBody(body))
-        .get();
+  public HttpResponse okKeepAliveConnection(String message) {
+    return HttpResponse.build200(Error.of(message).toJSON(), HttpResponse.MIME_APPLICATION_JSON, true).get();
   }
 
   public void handleAccept(ServerSocketChannel serverChannel, Selector selector) throws IOException {
@@ -91,7 +76,7 @@ public class Server {
     // something weird has happened
     if (clientCtx.getResponseBuffer().isEmpty()) {
       clientCtx.isError = true;
-      clientCtx.setResponse(makeServerErrorResponse());
+      clientCtx.setResponse(internalServerErrorCloseConnection());
     }
 
     var resBuf = clientCtx.getResponseBuffer().get();
@@ -237,7 +222,7 @@ public class Server {
       // the server has to reply with an appropriate
       // http response to then close the connection
       clientCtx.isError = true;
-      clientCtx.setResponse(makeBadResponse(error));
+      clientCtx.setResponse(badRequestCloseConnection(error));
 
       // deregister OP_READ, register OP_WRITE
       key.interestOps(SelectionKey.OP_WRITE);
@@ -249,7 +234,7 @@ public class Server {
       if (ereq.isLeft()) {
         // invalid http request because the parser has failed
         clientCtx.isError = true;
-        clientCtx.setResponse(makeBadResponse("invalid http request: " + ereq.getLeft()));
+        clientCtx.setResponse(badRequestCloseConnection("invalid http request: " + ereq.getLeft()));
 
         // deregister OP_READ, register OP_WRITE
         key.interestOps(SelectionKey.OP_WRITE);
@@ -266,7 +251,7 @@ public class Server {
           // set the http response accordingly to the jexpress result
           clientCtx.setResponse(
               eres.fold(
-                  err -> makeBadResponse(err),
+                  err -> badRequestCloseConnection(err),
                   res -> res));
 
           // deregister OP_READ, register OP_WRITE

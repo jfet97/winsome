@@ -94,12 +94,8 @@ public class JExpress {
       var middleware = middlewares.get(index);
 
       middleware.accept(request, parametersFromPath, eresponse -> {
-        var response = eresponse.recoverWith(err -> HttpResponse
-            .build(HttpResponse.HTTPV11, HttpResponse.CODE_500[0], HttpResponse.CODE_500[1])
-            .flatMap(res -> res.setHeader("Content-Type", "application/json"))
-            .flatMap(res -> res.setHeader("Content-Length", Error.of(err).toJSON().getBytes().length + ""))
-            .flatMap(r -> r.setHeader("Connection", "keep-alive"))
-            .flatMap(res -> res.setBody(Error.of(err).toJSON())));
+        var response = eresponse.recoverWith(err -> HttpResponse.build500(Error.of(err).toJSON(),
+            HttpResponse.MIME_APPLICATION_JSON, true));
 
         // set this response to be returned
         // (it will be returned unless a following middleware overwrites it)
@@ -145,12 +141,9 @@ public class JExpress {
               // next callback
               if (runRouteHandler.value) {
                 handler.accept(request, parametersFromPath, eresponse -> {
-                  var response = eresponse.recoverWith(err -> HttpResponse
-                      .build(HttpResponse.HTTPV11, HttpResponse.CODE_500[0], HttpResponse.CODE_500[1])
-                      .flatMap(res -> res.setHeader("Content-Type", "application/json"))
-                      .flatMap(r -> r.setHeader("Connection", "keep-alive"))
-                      .flatMap(res -> res.setHeader("Content-Length", Error.of(err).toJSON().getBytes().length + ""))
-                      .flatMap(res -> res.setBody(Error.of(err).toJSON())));
+
+                  var response = eresponse.recoverWith(err -> HttpResponse.build500(Error.of(err).toJSON(),
+                      HttpResponse.MIME_APPLICATION_JSON, true));
 
                   resWrapper.value = response;
                 });
@@ -160,12 +153,8 @@ public class JExpress {
         } else {
 
           // not found a proper handler for the request target
-          var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_404[0], HttpResponse.CODE_404[1])
-              .flatMap(res -> res.setHeader("Content-Type", "application/json"))
-              .flatMap(r -> r.setHeader("Connection", "keep-alive"))
-              .flatMap(res -> res.setHeader("Content-Length",
-                  Error.of(target + " not found").toJSON().getBytes().length + ""))
-              .flatMap(res -> res.setBody(Error.of(target + " not found").toJSON()));
+          var response = HttpResponse.build404(Error.of(target + " not found").toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON, true);
 
           resWrapper.value = response;
         }
@@ -173,12 +162,8 @@ public class JExpress {
       } else {
 
         // this HTTP method is not supported
-        var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_405[0], HttpResponse.CODE_405[1])
-            .flatMap(res -> res.setHeader("Content-Type", "application/json"))
-            .flatMap(r -> r.setHeader("Connection", "keep-alive"))
-            .flatMap(res -> res.setHeader("Content-Length",
-                Error.of(request.getMethod() + " not supported").toJSON().getBytes().length + ""))
-            .flatMap(res -> res.setBody(Error.of(request.getMethod() + " not supported").toJSON()));
+        var response = HttpResponse.build404(Error.of(request.getMethod() + " not supported").toJSON(),
+            HttpResponse.MIME_APPLICATION_JSON, true);
 
         resWrapper.value = response;
       }

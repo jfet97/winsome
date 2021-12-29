@@ -38,7 +38,7 @@ public class JExpressTest {
       usersCalled.value = true;
       usersIdCalled.value = false;
 
-      var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_200[0], HttpResponse.CODE_200[1])
+      var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.OK_200[0], HttpResponse.OK_200[1])
           .flatMap(req -> req.setHeader("Server", "nginx/0.8.54"))
           .flatMap(req -> req.setHeader("Date", "02 Jan 2012 02:33:17 GMT"))
           .flatMap(req -> req.setHeader("Content-Type", "text/html"))
@@ -56,7 +56,7 @@ public class JExpressTest {
       usersCalled.value = false;
       usersIdCalled.value = true;
 
-      var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_200[0], HttpResponse.CODE_200[1])
+      var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.OK_200[0], HttpResponse.OK_200[1])
           .flatMap(req -> req.setHeader("Server", "nginx/0.8.54"))
           .flatMap(req -> req.setHeader("Date", "02 Jan 2012 02:33:17 GMT"))
           .flatMap(req -> req.setHeader("Content-Type", "text/html"))
@@ -133,7 +133,7 @@ public class JExpressTest {
 
     jexpress.get("/users", (request, params, reply) -> {
 
-      var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_200[0], HttpResponse.CODE_200[1])
+      var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.OK_200[0], HttpResponse.OK_200[1])
           .flatMap(req -> req.setHeader("Server", "nginx/0.8.54"))
           .flatMap(req -> req.setHeader("Date", "02 Jan 2012 02:33:17 GMT"))
           .flatMap(req -> req.setHeader("Content-Type", "text/html"))
@@ -149,7 +149,7 @@ public class JExpressTest {
 
     jexpress.get("/users/:id", (request, params, reply) -> {
 
-      var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_200[0], HttpResponse.CODE_200[1])
+      var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.OK_200[0], HttpResponse.OK_200[1])
           .flatMap(req -> req.setHeader("Server", "nginx/0.8.54"))
           .flatMap(req -> req.setHeader("Date", "02 Jan 2012 02:33:17 GMT"))
           .flatMap(req -> req.setHeader("Content-Type", "text/html"))
@@ -200,7 +200,7 @@ public class JExpressTest {
       }
 
       if (error) {
-        var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_401[0], HttpResponse.CODE_401[1])
+        var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.UNAUTHORIZED_401[0], HttpResponse.UNAUTHORIZED_401[1])
             .flatMap(req -> req.setHeader("Server", "nginx/0.8.54"))
             .flatMap(req -> req.setHeader("Date", "02 Jan 2012 02:33:17 GMT"))
             .flatMap(req -> req.setHeader("Content-Type", "text/html"))

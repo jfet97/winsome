@@ -295,8 +295,7 @@ public class Winsome {
         .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
         .flatMap(__ -> Either.<String, User>right(network.get(author)))
         .flatMap(a -> a == null ? Either.left("unknown user " + author) : Either.right(a))
-        .flatMap(a -> getPost(a.username, postUuid))
-        .map(p -> p);
+        .flatMap(a -> getPost(a.username, postUuid));
   }
 
   public Either<String, Post> deletePost(String username, String postUuid) {

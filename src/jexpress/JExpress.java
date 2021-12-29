@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import domain.error.Error;
 import http.HttpRequest;
 import http.HttpResponse;
 import io.vavr.control.Either;
@@ -83,7 +84,7 @@ public class JExpress {
 
   private void runMiddlewares(HttpRequest request, Map<String, String> parametersFromPath,
       List<QuadriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>, Runnable>> middlewares,
-      Integer index, Wrapper<Boolean> runRouteHandlers) {
+      Integer index, Wrapper<Boolean> runRouteHandler) {
 
     try {
       var middleware = middlewares.get(index);
@@ -91,15 +92,16 @@ public class JExpress {
       middleware.accept(request, parametersFromPath, eresponse -> {
         var response = eresponse.getOrElseGet(err -> HttpResponse
             .build(HttpResponse.HTTPV11, HttpResponse.CODE_500[0], HttpResponse.CODE_500[1])
-            .flatMap(res -> res.setHeader("Content-Type", "text/plain; charset=UTF-8"))
-            .flatMap(res -> res.setBody(err))
+            .flatMap(res -> res.setHeader("Content-Type", "application/json"))
+            .flatMap(res -> res.setBody(Error.of(err).toJSON()))
             .get());
 
         // TODO: send this response
-      }, () -> runMiddlewares(request, parametersFromPath, middlewares, index + 1, runRouteHandlers));
+      }, () -> runMiddlewares(request, parametersFromPath, middlewares, index + 1, runRouteHandler));
+
     } catch (Exception e) {
       // expect an IOOB exception when we run out of middlewares
-      runRouteHandlers.value = true;
+      runRouteHandler.value = true;
     }
 
   }
@@ -125,19 +127,19 @@ public class JExpress {
 
             if (route.matches(target)) {
               var parametersFromPath = route.getParametersFromPath(target);
-              var runRouteHandlers = Wrapper.of(false);
+              var runRouteHandler = Wrapper.of(false);
 
               // first: run middlewares
-              runMiddlewares(request, parametersFromPath, this.globalMiddlewares, 0, runRouteHandlers);
+              runMiddlewares(request, parametersFromPath, this.globalMiddlewares, 0, runRouteHandler);
 
               // second: call the route handler only if the last middleware has called the
               // next callback
-              if (runRouteHandlers.value) {
+              if (runRouteHandler.value) {
                 handler.accept(request, parametersFromPath, eresponse -> {
                   var response = eresponse.getOrElseGet(err -> HttpResponse
                       .build(HttpResponse.HTTPV11, HttpResponse.CODE_500[0], HttpResponse.CODE_500[1])
-                      .flatMap(res -> res.setHeader("Content-Type", "text/plain; charset=UTF-8"))
-                      .flatMap(res -> res.setBody(err))
+                      .flatMap(res -> res.setHeader("Content-Type", "application/json"))
+                      .flatMap(res -> res.setBody(Error.of(err).toJSON()))
                       .get());
 
                   // TODO: send this response
@@ -149,8 +151,8 @@ public class JExpress {
 
           // not found a proper handler for the request target
           var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_404[0], HttpResponse.CODE_404[1])
-              .flatMap(res -> res.setHeader("Content-Type", "text/plain; charset=UTF-8"))
-              .flatMap(res -> res.setBody(target + " not found"))
+              .flatMap(res -> res.setHeader("Content-Type", "application/json"))
+              .flatMap(res -> res.setBody(Error.of(target + " not found").toJSON()))
               .get();
 
           // TODO: send this response
@@ -160,8 +162,8 @@ public class JExpress {
 
         // this HTTP method is not supported
         var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_405[0], HttpResponse.CODE_405[1])
-            .flatMap(res -> res.setHeader("Content-Type", "text/plain; charset=UTF-8"))
-            .flatMap(res -> res.setBody(request.getMethod() + " not supported"))
+            .flatMap(res -> res.setHeader("Content-Type", "application/json"))
+            .flatMap(res -> res.setBody(Error.of(request.getMethod() + " not supported").toJSON()))
             .get();
 
         // TODO: send this response

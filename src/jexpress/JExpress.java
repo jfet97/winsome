@@ -34,6 +34,10 @@ public class JExpress {
     this.routes.put(DELETE, new HashMap<>());
   }
 
+  public static JExpress of() {
+    return new JExpress();
+  }
+
   // -------------------------------------------------
   // middlewares registration
 
@@ -84,20 +88,23 @@ public class JExpress {
 
   private void runMiddlewares(HttpRequest request, Map<String, String> parametersFromPath,
       List<QuadriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>, Runnable>> middlewares,
-      Integer index, Wrapper<Boolean> runRouteHandler) {
+      Integer index, Wrapper<Boolean> runRouteHandler, Wrapper<Either<String, HttpResponse>> resWrapper) {
 
     try {
       var middleware = middlewares.get(index);
 
       middleware.accept(request, parametersFromPath, eresponse -> {
-        var response = eresponse.getOrElseGet(err -> HttpResponse
+        var response = eresponse.recoverWith(err -> HttpResponse
             .build(HttpResponse.HTTPV11, HttpResponse.CODE_500[0], HttpResponse.CODE_500[1])
             .flatMap(res -> res.setHeader("Content-Type", "application/json"))
-            .flatMap(res -> res.setBody(Error.of(err).toJSON()))
-            .get());
+            .flatMap(res -> res.setHeader("Content-Length", Error.of(err).toJSON().getBytes().length + ""))
+            .flatMap(r -> r.setHeader("Connection", "keep-alive"))
+            .flatMap(res -> res.setBody(Error.of(err).toJSON())));
 
-        // TODO: send this response
-      }, () -> runMiddlewares(request, parametersFromPath, middlewares, index + 1, runRouteHandler));
+        // set this response to be returned
+        // (it will be returned unless a following middleware overwrites it)
+        resWrapper.value = response;
+      }, () -> runMiddlewares(request, parametersFromPath, middlewares, index + 1, runRouteHandler, resWrapper));
 
     } catch (Exception e) {
       // expect an IOOB exception when we run out of middlewares
@@ -107,8 +114,10 @@ public class JExpress {
   }
 
   // this method is thread safe as long as the configuration process has finished
-  // TODO: second parameter, a socket on which write the response
-  public void handle(HttpRequest request) {
+  public Either<String, HttpResponse> handle(HttpRequest request) {
+
+    var resWrapper = Wrapper.<Either<String, HttpResponse>>of(null);
+
     if (request != null) {
       // get the handlers based on the request HTTP method
       var handlers = this.routes.get(request.getMethod());
@@ -130,19 +139,20 @@ public class JExpress {
               var runRouteHandler = Wrapper.of(false);
 
               // first: run middlewares
-              runMiddlewares(request, parametersFromPath, this.globalMiddlewares, 0, runRouteHandler);
+              runMiddlewares(request, parametersFromPath, this.globalMiddlewares, 0, runRouteHandler, resWrapper);
 
               // second: call the route handler only if the last middleware has called the
               // next callback
               if (runRouteHandler.value) {
                 handler.accept(request, parametersFromPath, eresponse -> {
-                  var response = eresponse.getOrElseGet(err -> HttpResponse
+                  var response = eresponse.recoverWith(err -> HttpResponse
                       .build(HttpResponse.HTTPV11, HttpResponse.CODE_500[0], HttpResponse.CODE_500[1])
                       .flatMap(res -> res.setHeader("Content-Type", "application/json"))
-                      .flatMap(res -> res.setBody(Error.of(err).toJSON()))
-                      .get());
+                      .flatMap(r -> r.setHeader("Connection", "keep-alive"))
+                      .flatMap(res -> res.setHeader("Content-Length", Error.of(err).toJSON().getBytes().length + ""))
+                      .flatMap(res -> res.setBody(Error.of(err).toJSON())));
 
-                  // TODO: send this response
+                  resWrapper.value = response;
                 });
               }
             }
@@ -152,10 +162,12 @@ public class JExpress {
           // not found a proper handler for the request target
           var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_404[0], HttpResponse.CODE_404[1])
               .flatMap(res -> res.setHeader("Content-Type", "application/json"))
-              .flatMap(res -> res.setBody(Error.of(target + " not found").toJSON()))
-              .get();
+              .flatMap(r -> r.setHeader("Connection", "keep-alive"))
+              .flatMap(res -> res.setHeader("Content-Length",
+                  Error.of(target + " not found").toJSON().getBytes().length + ""))
+              .flatMap(res -> res.setBody(Error.of(target + " not found").toJSON()));
 
-          // TODO: send this response
+          resWrapper.value = response;
         }
 
       } else {
@@ -163,11 +175,15 @@ public class JExpress {
         // this HTTP method is not supported
         var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.CODE_405[0], HttpResponse.CODE_405[1])
             .flatMap(res -> res.setHeader("Content-Type", "application/json"))
-            .flatMap(res -> res.setBody(Error.of(request.getMethod() + " not supported").toJSON()))
-            .get();
+            .flatMap(r -> r.setHeader("Connection", "keep-alive"))
+            .flatMap(res -> res.setHeader("Content-Length",
+                Error.of(request.getMethod() + " not supported").toJSON().getBytes().length + ""))
+            .flatMap(res -> res.setBody(Error.of(request.getMethod() + " not supported").toJSON()));
 
-        // TODO: send this response
+        resWrapper.value = response;
       }
     }
+
+    return resWrapper.value;
   }
 }

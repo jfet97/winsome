@@ -7,12 +7,13 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-
+import java.util.concurrent.CompletableFuture;
 import domain.constant.Constant;
 import domain.error.Error;
 import http.HttpRequest;
 import http.HttpResponse;
 import io.vavr.control.Either;
+import jexpress.JExpress;
 
 public class Server {
   public static void main(String[] args) {
@@ -37,6 +38,8 @@ public class Server {
       e.printStackTrace();
     }
   }
+
+  private JExpress jexpress = JExpress.of();
 
   public HttpResponse makeBadResponse(String error) {
     var errorJSON = Error.of(error).toJSON();
@@ -187,7 +190,7 @@ public class Server {
 
   }
 
-  public void handleRead(SelectionKey key, ByteBuffer buf) throws IOException {
+  public void handleRead(SelectionKey key, ByteBuffer buf, Selector selector) throws IOException {
 
     var clientCtx = (RequestContext) key.attachment();
     var client = (SocketChannel) key.channel();
@@ -241,7 +244,6 @@ public class Server {
 
     } else if (clientCtx.yetToRead == 0) {
       // nothing more to read
-      System.out.println(clientCtx.bufferToString(true));
       var ereq = HttpRequest.parse(clientCtx.bufferToString(true));
 
       if (ereq.isLeft()) {
@@ -249,21 +251,33 @@ public class Server {
         clientCtx.isError = true;
         clientCtx.setResponse(makeBadResponse("invalid http request: " + ereq.getLeft()));
 
+        // deregister OP_READ, register OP_WRITE
+        key.interestOps(SelectionKey.OP_WRITE);
+
       } else {
         // get a valid request instance
         var req = ereq.get();
 
-        // handle using the thread pool
-        var res = makeOkResponse(
-            "<!DOCTYPE html><html><body><h1>Your request was:</h1></br>" + req.toString()
-                + "</body></html>");
+        // handle using a common thread pool
+        var reqResult = CompletableFuture.supplyAsync(() -> jexpress.handle(req));
 
-        clientCtx.setResponse(res);
+        reqResult.thenAccept(eres -> {
+
+          // set the http response accordingly to the jexpress result
+          clientCtx.setResponse(
+              eres.fold(
+                  err -> makeBadResponse(err),
+                  res -> res));
+
+          // deregister OP_READ, register OP_WRITE
+          key.interestOps(SelectionKey.OP_WRITE);
+
+          // needed because we update the interests set asynchronously
+          selector.wakeup();
+
+        });
 
       }
-
-      // deregister OP_READ, register OP_WRITE
-      key.interestOps(SelectionKey.OP_WRITE);
 
     } else {
       // we haven't read the whole request yet
@@ -289,7 +303,7 @@ public class Server {
 
       // shared, fixed buffer between requests
       // (safe because NIO input reading is single-threaded)
-      var buf = ByteBuffer.allocate(100);
+      var buf = ByteBuffer.allocate(16384);
 
       while (true) {
         try {
@@ -312,7 +326,7 @@ public class Server {
 
               } else if (key.isReadable()) {
 
-                this.handleRead(key, buf);
+                this.handleRead(key, buf, selector);
 
               } else if (key.isWritable()) {
 

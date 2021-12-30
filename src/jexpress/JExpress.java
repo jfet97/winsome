@@ -94,8 +94,9 @@ public class JExpress {
       var middleware = middlewares.get(index);
 
       middleware.accept(request, parametersFromPath, eresponse -> {
-        var response = eresponse.recoverWith(err -> HttpResponse.build500(Feedback.error(err).toJSON(),
-            HttpResponse.MIME_APPLICATION_JSON, true));
+        var response = eresponse.recoverWith(
+            err -> HttpResponse.build500(Feedback.error(Feedback.toJSON(err)).toJSON(),
+                HttpResponse.MIME_APPLICATION_JSON, true));
 
         // set this response to be returned
         // (it will be returned unless a following middleware overwrites it)
@@ -143,8 +144,9 @@ public class JExpress {
               if (runRouteHandler.value) {
                 handler.accept(request, parametersFromPath, eresponse -> {
 
-                  var response = eresponse.recoverWith(err -> HttpResponse.build500(Feedback.error(err).toJSON(),
-                      HttpResponse.MIME_APPLICATION_JSON, true));
+                  var response = eresponse
+                      .recoverWith(err -> HttpResponse.build500(Feedback.error(Feedback.toJSON(err)).toJSON(),
+                          HttpResponse.MIME_APPLICATION_JSON, true));
 
                   resWrapper.value = response;
                 });
@@ -155,7 +157,7 @@ public class JExpress {
 
           // not found a proper handler for the request target
           var response = HttpResponse.build404(
-              Feedback.error(method + " is not supported for route " + target).toJSON(),
+              Feedback.error(Feedback.toJSON(method + " is not supported for route " + target)).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON, true);
 
           resWrapper.value = response;
@@ -164,7 +166,7 @@ public class JExpress {
       } else {
 
         // this HTTP method is not supported
-        var response = HttpResponse.build404(Feedback.error(method + "is not supported").toJSON(),
+        var response = HttpResponse.build404(Feedback.error(Feedback.toJSON(method + "is not supported")).toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
 
         resWrapper.value = response;

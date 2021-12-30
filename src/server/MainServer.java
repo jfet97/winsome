@@ -292,6 +292,34 @@ public class MainServer {
       reply.accept(toRet);
     });
 
+    // view a post
+    jexpress.get(USERS_ROUTE + "/:user_id" + POSTS_ROUTE + "/:post_id", (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+
+      try {
+        // authenticated user
+        var user = (User) req.context;
+
+        // it seems that any user can see any other user's post
+
+        toRet = winsome
+            .showPost(user.username, params.get("user_id"), params.get("post_id"))
+            .flatMap(p -> HttpResponse.build200(
+                Feedback.right(p.toJSON()).toJSON(),
+                HttpResponse.MIME_APPLICATION_JSON, true))
+            .recoverWith(err -> HttpResponse.build400(
+                Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                HttpResponse.MIME_APPLICATION_JSON,
+                true));
+
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
+      }
+
+      reply.accept(toRet);
+    });
+
     // get a list of users with at least one common tag with the requestor
     jexpress.get(USERS_ROUTE, (req, params, reply) -> {
 
@@ -410,6 +438,49 @@ public class MainServer {
               .flatMap(__ -> HttpResponse.build200(
                   Feedback.right(
                       ToJSON.toJSON("now " + user.username + " is following " + userToFollow.username))
+                      .toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
+        }
+
+      } catch (JsonProcessingException e) {
+        toRet = HttpResponse.build400(
+            Feedback.error(
+                ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
+            HttpResponse.MIME_APPLICATION_JSON, true);
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
+      }
+
+      reply.accept(toRet);
+
+    });
+
+    // unfollow an user
+    jexpress.delete(USERS_ROUTE + "/:user_id" + FOLLOWING_ROUTE, (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+
+      try {
+        var user = (User) req.context;
+        var userToUnfollow = objectMapper.readValue(req.getBody(), User.class);
+
+        // an user cannot force another user to unfollow someone
+        if (!user.username.equals(params.get("user_id"))) {
+          toRet = HttpResponse.build401(
+              Feedback.error(
+                  ToJSON.toJSON("unauthorized")).toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON,
+              true);
+        } else {
+          toRet = winsome
+              .unfollowUser(user.username, userToUnfollow.username)
+              .flatMap(__ -> HttpResponse.build200(
+                  Feedback.right(
+                      ToJSON.toJSON(user.username + " has unfollowed " + userToUnfollow.username))
                       .toJSON(),
                   HttpResponse.MIME_APPLICATION_JSON, true))
               .recoverWith(err -> HttpResponse.build400(

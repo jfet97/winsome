@@ -9,9 +9,11 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
+import domain.comment.Comment;
 import domain.feedback.Feedback;
 import domain.post.Post;
 import domain.reaction.Reaction;
@@ -36,13 +38,15 @@ public class MainServer {
   private static String FEED_ROUTE = "/feed";
   private static String COMMENTS_ROUTE = "/comments";
   private static String REACTIONS_ROUTE = "/reactions";
+  private static String WALLET_ROUTE = "/wallet";
 
   public static void main(String[] args) {
 
     var port = 12345;
     var ip = "192.168.1.113";
 
-    var objectMapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    var objectMapper = new ObjectMapper()
+        .enable(SerializationFeature.INDENT_OUTPUT);
 
     var jexpress = JExpress.of();
     var winsome = Winsome.of();
@@ -364,7 +368,7 @@ public class MainServer {
 
         var reaction = objectMapper.readValue(req.getBody(), Reaction.class);
 
-        if (reaction.isUpvote != null) {
+        if (reaction.isUpvote != null && reaction.isUpvote instanceof Boolean) {
           toRet = winsome
               .ratePost(user.username, params.get("user_id"), params.get("post_id"), reaction.isUpvote)
               .flatMap(r -> HttpResponse.build200(
@@ -377,6 +381,46 @@ public class MainServer {
         } else {
           toRet = HttpResponse.build400(
               Feedback.error(ToJSON.toJSON("Missing boolean 'isUpvote' field")).toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON,
+              true);
+        }
+
+      } catch (JsonProcessingException e) {
+        toRet = HttpResponse.build400(
+            Feedback.error(
+                ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
+            HttpResponse.MIME_APPLICATION_JSON, true);
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
+      }
+
+      reply.accept(toRet);
+    });
+
+    // add a comment to a post
+    jexpress.post(USERS_ROUTE + "/:user_id" + POSTS_ROUTE + "/:post_id" + COMMENTS_ROUTE, (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+
+      try {
+        // authenticated user
+        var user = (User) req.context;
+
+        var comment = objectMapper.readValue(req.getBody(), Comment.class);
+
+        if (comment.text != null && comment.text instanceof String) {
+          toRet = winsome
+              .addComment(user.username, params.get("user_id"), params.get("post_id"), comment.text)
+              .flatMap(c -> HttpResponse.build200(
+                  Feedback.right(c.toJSON()).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
+        } else {
+          toRet = HttpResponse.build400(
+              Feedback.error(ToJSON.toJSON("Missing string 'text' field")).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON,
               true);
         }
@@ -510,7 +554,7 @@ public class MainServer {
               .followUser(user.username, userToFollow.username)
               .flatMap(__ -> HttpResponse.build200(
                   Feedback.right(
-                      ToJSON.toJSON("now " + user.username + " is following " + userToFollow.username))
+                      ToJSON.toJSON(user.username + " is following " + userToFollow.username))
                       .toJSON(),
                   HttpResponse.MIME_APPLICATION_JSON, true))
               .recoverWith(err -> HttpResponse.build400(
@@ -635,6 +679,58 @@ public class MainServer {
               .map(ps -> ToJSON.sequence(ps))
               .flatMap(jps -> HttpResponse.build200(Feedback.right(jps).toJSON(),
                   HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
+        }
+
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
+      }
+
+      reply.accept(toRet);
+
+    });
+
+    // get the wallet of a user
+    jexpress.get(USERS_ROUTE + "/:user_id" + WALLET_ROUTE, (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+      var currency = req.getQueryParams().get("currency");
+      var useWincoins = currency != null && currency.equals("wincoin");
+      var useBitcoins = currency != null && currency.equals("bitcoin");
+
+      try {
+        var user = (User) req.context;
+
+        // an user is authorized to see only its own wallet
+        if (!user.username.equals(params.get("user_id"))) {
+          toRet = HttpResponse.build401(Feedback.error(ToJSON.toJSON("unauthorized")).toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON,
+              true);
+        } else {
+
+          var ess = Either.<String, String>right(null);
+
+          if (useWincoins) {
+            ess = winsome
+                .getUserWalletInWincoin(user.username)
+                .map(ws -> ToJSON.toJSON(ws));
+
+            ;
+          } else if (useBitcoins) {
+            ess = winsome
+                .getUserWalletInBitcoin(user.username)
+                .map(ws -> ToJSON.toJSON(ws));
+          } else {
+            ess = winsome.getUserWallet(user.username)
+                .map(ws -> ws.stream().map(w -> w.toJSON()).collect(Collectors.toList()))
+                .map(ws -> ToJSON.sequence(ws));
+          }
+
+          toRet = ess.flatMap(jps -> HttpResponse.build200(Feedback.right(jps).toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON, true))
               .recoverWith(err -> HttpResponse.build400(
                   Feedback.error(ToJSON.toJSON(err)).toJSON(),
                   HttpResponse.MIME_APPLICATION_JSON,

@@ -468,6 +468,43 @@ public class MainServer {
 
     });
 
+    // get the feed of a user
+    jexpress.get(USERS_ROUTE + "/:user_id" + FEED_ROUTE, (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+
+      try {
+        var user = (User) req.context;
+
+        // an user is authorized to see only its own feed
+        if (!user.username.equals(params.get("user_id"))) {
+          toRet = HttpResponse.build401(Feedback.error(ToJSON.toJSON("unauthorized")).toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON,
+              true);
+        } else {
+          toRet = winsome
+              .showFeed(user.username)
+              .map(ps -> ps
+                  .stream()
+                  .map(p -> p.toJSON())
+                  .collect(Collectors.toList()))
+              .map(ps -> ToJSON.sequence(ps))
+              .flatMap(jps -> HttpResponse.build200(Feedback.right(jps).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
+        }
+
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
+      }
+
+      reply.accept(toRet);
+
+    });
+
   }
 
 }

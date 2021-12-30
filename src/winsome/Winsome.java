@@ -86,7 +86,7 @@ public class Winsome {
         .map(pair -> pair.fst().posts.computeIfAbsent(pair.snd().uuid, __ -> pair.snd()));
   }
 
-  public Either<String, List<Post>> viewUserBlog(String username) {
+  private Either<String, List<Post>> viewUserBlog(String username) {
     return nullGuard(username, "username")
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .map(u -> u.posts.entrySet()

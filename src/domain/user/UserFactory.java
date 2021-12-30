@@ -59,6 +59,7 @@ public class UserFactory {
             .distinct()
             .filter(tag -> tag != null && !tag.equals(""))
             .map(String::trim)
+            .map(String::toLowerCase)
             .map(t -> t.replaceAll("\n|\r|\r\n", ""))
             .collect(Collectors.toList());
 

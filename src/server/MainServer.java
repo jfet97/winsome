@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 
 import domain.feedback.Feedback;
 import domain.post.Post;
+import domain.reaction.Reaction;
 import domain.user.User;
 import http.HttpResponse;
 import io.vavr.control.Either;
@@ -324,8 +325,6 @@ public class MainServer {
       var toRet = Either.<String, HttpResponse>right(null);
       var queryParams = req.getQueryParams();
 
-      System.out.println(params.get("post_id"));
-
       try {
         // authenticated user
         var user = (User) req.context;
@@ -347,6 +346,46 @@ public class MainServer {
               true);
         }
 
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
+      }
+
+      reply.accept(toRet);
+    });
+
+    // add a reaction to a post
+    jexpress.post(USERS_ROUTE + "/:user_id" + POSTS_ROUTE + "/:post_id" + REACTIONS_ROUTE, (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+
+      try {
+        // authenticated user
+        var user = (User) req.context;
+
+        var reaction = objectMapper.readValue(req.getBody(), Reaction.class);
+
+        if (reaction.isUpvote != null) {
+          toRet = winsome
+              .ratePost(user.username, params.get("user_id"), params.get("post_id"), reaction.isUpvote)
+              .flatMap(r -> HttpResponse.build200(
+                  Feedback.right(r.toJSON()).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
+        } else {
+          toRet = HttpResponse.build400(
+              Feedback.error(ToJSON.toJSON("Missing boolean 'isUpvote' field")).toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON,
+              true);
+        }
+
+      } catch (JsonProcessingException e) {
+        toRet = HttpResponse.build400(
+            Feedback.error(
+                ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
+            HttpResponse.MIME_APPLICATION_JSON, true);
       } catch (Exception e) {
         toRet = Either.left(e.getMessage());
       }

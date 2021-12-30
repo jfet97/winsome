@@ -8,50 +8,41 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.CompletableFuture;
+
 import domain.constant.Constant;
-import domain.error.Error;
+import domain.feedback.Feedback;
 import http.HttpRequest;
 import http.HttpResponse;
 import io.vavr.control.Either;
 import jexpress.JExpress;
 
-public class Server {
-  public static void main(String[] args) {
+public class Server implements Runnable {
+  private JExpress jexpress;
+  private Integer port;
+  private String ip;
 
-    var port = 12345;
-    var ip = "192.168.1.113";
-
-    var server = new Server();
-
-    var t = new Thread(() -> {
-      try {
-        server.run(port, ip);
-      } catch (Exception e) {
-        e.printStackTrace();
-      }
-    });
-
-    t.start();
-    try {
-      t.join();
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    }
+  private Server(JExpress jexpress, String ip, Integer port) {
+    this.jexpress = jexpress;
+    this.ip = ip;
+    this.port = port;
   }
 
-  private JExpress jexpress = JExpress.of();
+  // API
+  public static Server of(JExpress jexpress, String ip, Integer port) {
+    return new Server(jexpress, ip, port);
+  }
 
   public HttpResponse badRequestCloseConnection(String error) {
-    return HttpResponse.build400(Error.of(error).toJSON(), HttpResponse.MIME_APPLICATION_JSON, false).get();
+    return HttpResponse.build400(Feedback.error(error).toJSON(), HttpResponse.MIME_APPLICATION_JSON, false).get();
   }
 
   public HttpResponse internalServerErrorCloseConnection() {
-    return HttpResponse.build500(Error.of(
+    return HttpResponse.build500(Feedback.error(
         "INTERNAL SERVER ERROR").toJSON(), HttpResponse.MIME_APPLICATION_JSON, false).get();
   }
 
   public HttpResponse okKeepAliveConnection(String message) {
-    return HttpResponse.build200(Error.of(message).toJSON(), HttpResponse.MIME_APPLICATION_JSON, true).get();
+    return HttpResponse.build200(Feedback.error(message).toJSON(), HttpResponse.MIME_APPLICATION_JSON, true).get();
   }
 
   public void handleAccept(ServerSocketChannel serverChannel, Selector selector) throws IOException {
@@ -271,7 +262,7 @@ public class Server {
 
   }
 
-  public void run(int port, String ip) throws Exception {
+  public void run() {
 
     // set up the server
     try (var serverChannel = ServerSocketChannel.open();
@@ -348,4 +339,5 @@ public class Server {
       e.printStackTrace();
     }
   }
+
 }

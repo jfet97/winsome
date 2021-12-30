@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-import domain.error.Error;
+import domain.feedback.Feedback;
 import http.HttpRequest;
 import http.HttpResponse;
 import io.vavr.control.Either;
@@ -94,7 +94,7 @@ public class JExpress {
       var middleware = middlewares.get(index);
 
       middleware.accept(request, parametersFromPath, eresponse -> {
-        var response = eresponse.recoverWith(err -> HttpResponse.build500(Error.of(err).toJSON(),
+        var response = eresponse.recoverWith(err -> HttpResponse.build500(Feedback.error(err).toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true));
 
         // set this response to be returned
@@ -142,7 +142,7 @@ public class JExpress {
               if (runRouteHandler.value) {
                 handler.accept(request, parametersFromPath, eresponse -> {
 
-                  var response = eresponse.recoverWith(err -> HttpResponse.build500(Error.of(err).toJSON(),
+                  var response = eresponse.recoverWith(err -> HttpResponse.build500(Feedback.error(err).toJSON(),
                       HttpResponse.MIME_APPLICATION_JSON, true));
 
                   resWrapper.value = response;
@@ -153,7 +153,7 @@ public class JExpress {
         } else {
 
           // not found a proper handler for the request target
-          var response = HttpResponse.build404(Error.of(target + " not found").toJSON(),
+          var response = HttpResponse.build404(Feedback.error(target + " not found").toJSON(),
               HttpResponse.MIME_APPLICATION_JSON, true);
 
           resWrapper.value = response;
@@ -162,7 +162,7 @@ public class JExpress {
       } else {
 
         // this HTTP method is not supported
-        var response = HttpResponse.build404(Error.of(request.getMethod() + " not supported").toJSON(),
+        var response = HttpResponse.build404(Feedback.error(request.getMethod() + " not supported").toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
 
         resWrapper.value = response;

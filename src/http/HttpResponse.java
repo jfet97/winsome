@@ -32,6 +32,7 @@ public class HttpResponse {
 
   public static final String MIME_APPLICATION_JSON = "application/json";
   public static final String MIME_TEXT_PLAIN = "text/plain";
+  public static final String MIME_TEXT_HTML = "text/html";
 
   public static Either<String, HttpResponse> build(String HTTPVersion, String statusCode, String reasonPhrase) {
     HttpResponse instance = new HttpResponse();

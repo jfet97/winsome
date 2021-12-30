@@ -1,15 +1,12 @@
 package server;
 
 import java.io.File;
-import java.util.List;
 import java.util.stream.Collectors;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
@@ -23,7 +20,6 @@ import io.vavr.control.Either;
 import jexpress.JExpress;
 import secrets.Secrets;
 import utils.ToJSON;
-import utils.Wrapper;
 import winsome.Winsome;
 
 public class MainServer {

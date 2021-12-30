@@ -1,7 +1,5 @@
 package jexpress.expressrouting.tests;
 
-import java.util.Map;
-
 import org.junit.jupiter.api.Test;
 
 import jexpress.expressrouting.ExpressRoute;

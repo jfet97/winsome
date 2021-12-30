@@ -26,7 +26,7 @@ public class HttpResponse {
   public static final String[] CREATED_201 = { "201", "Created" };
   public static final String[] BAD_REQUEST_400 = { "400", "Bad Request" };
   public static final String[] UNAUTHORIZED_401 = { "401", "Unauthorized" };
-  public static final String[] FORBIDDEN_403 = { "401", "Forbidden" };
+  public static final String[] FORBIDDEN_403 = { "403", "Forbidden" };
   public static final String[] NOT_FOUND_404 = { "404", "Not Found" };
   public static final String[] METHOD_NOT_ALLOWED_405 = { "405", "Method Not Allowed" };
   public static final String[] INTERNAL_SERVER_ERROR_500 = { "500", "Internal Server Error" };

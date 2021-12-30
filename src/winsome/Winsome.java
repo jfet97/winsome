@@ -34,6 +34,7 @@ import io.vavr.control.Either;
 import secrets.Secrets;
 import utils.HashPassword;
 import utils.Pair;
+import utils.QuadriConsumer;
 import utils.Triple;
 import utils.Wrapper;
 
@@ -45,6 +46,10 @@ public class Winsome {
   private final ConcurrentMap<String, Boolean> loggedUsers = new ConcurrentHashMap<>();
   @JsonProperty("wallet")
   private final Wallet wallet = Wallet.of();
+
+  private QuadriConsumer<String, String, List<String>, Boolean> onChangeFollowers = (performer, receiver,
+      receiverFollowersUpdated, hasFollowed) -> {
+  };
 
   // ---------------------------------------
   // internals
@@ -98,6 +103,10 @@ public class Winsome {
 
   // ---------------------------------------
   // API
+
+  public void setOnChangeFollowers(QuadriConsumer<String, String, List<String>, Boolean> cb) {
+    this.onChangeFollowers = cb;
+  }
 
   public Either<String, User> register(String username, String password, List<String> tags) {
 
@@ -219,9 +228,22 @@ public class Winsome {
                     u2 -> u2 == null ? Either.left("unknown user " + usernameToFollow) : Either.right(Pair.of(u, u2))))
         .flatMap(p -> !loggedUsers.containsKey(p.fst().username) ? Either.left("user is not logged") : Either.right(p))
         .flatMap(p -> {
-          p.fst().addFollowing(p.snd().username);
-          p.snd().addFollower(p.fst().username);
-          return Either.<String, Void>right(null);
+          var b1 = false;
+          var b2 = false;
+          synchronized (p.fst().following) {
+            synchronized (p.snd().followers) {
+              b1 = p.fst().addFollowing(p.snd().username);
+              b2 = p.snd().addFollower(p.fst().username);
+            }
+          }
+          if (b1 && b2) {
+            onChangeFollowers.accept(p.fst().username, p.snd().username, p.snd().getFollowers(), true);
+            return Either.<String, Void>right(null);
+          } else {
+            return Either.left(username + " was already following " + usernameToFollow);
+          }
+
+          
         });
   }
 
@@ -237,9 +259,20 @@ public class Winsome {
                         : Either.right(Pair.of(u, u2))))
         .flatMap(p -> !loggedUsers.containsKey(p.fst().username) ? Either.left("user is not logged") : Either.right(p))
         .flatMap(p -> {
-          p.fst().removeFollowing(p.snd().username);
-          p.snd().removeFollower(p.fst().username);
-          return Either.<String, Void>right(null);
+          var b1 = false;
+          var b2 = false;
+          synchronized (p.fst().following) {
+            synchronized (p.snd().followers) {
+              b1 = p.fst().removeFollowing(p.snd().username);
+              b2 = p.snd().removeFollower(p.fst().username);
+            }
+          }
+          if (b1 && b2) {
+            onChangeFollowers.accept(p.fst().username, p.snd().username, p.snd().getFollowers(), false);
+            return Either.<String, Void>right(null);
+          } else {
+            return Either.left(username + " wasn't following " + usernameToUnfollow);
+          }
         });
   }
 

@@ -1,6 +1,9 @@
 package server;
 
 import java.io.File;
+import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.server.UnicastRemoteObject;
 import java.util.stream.Collectors;
 
 import com.auth0.jwt.JWT;
@@ -19,6 +22,8 @@ import http.HttpResponse;
 import io.vavr.control.Either;
 import jexpress.JExpress;
 import secrets.Secrets;
+import server.RMI.IRemoteServer;
+import server.RMI.RemoteServer;
 import utils.ToJSON;
 import winsome.Winsome;
 
@@ -36,9 +41,12 @@ public class MainServer {
   private static String REACTIONS_ROUTE = "/reactions";
   private static String WALLET_ROUTE = "/wallet";
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws RemoteException {
 
     var port = 12345;
+    var remotePort = 23456;
+    var remoteRegistryPort = 1789;
+    var remoteName = "rmi://127.0.0.1:" + remoteRegistryPort;
     var ip = "192.168.1.113";
 
     var objectMapper = new ObjectMapper()
@@ -52,6 +60,27 @@ public class MainServer {
           new File("/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/server/winsome.json"), Winsome.class);
     } catch (Exception e) {
     }
+
+    // RMI setup
+    var remoteServer = RemoteServer.of(winsome);
+
+    var stub = (IRemoteServer) UnicastRemoteObject.exportObject(remoteServer, remotePort);
+    LocateRegistry.createRegistry(remoteRegistryPort);
+    LocateRegistry.getRegistry(remoteRegistryPort).rebind(remoteName, stub);
+
+    winsome.setOnChangeFollowers((performer, receiver,
+        receiverFollowersUpdated, hasFollowed) -> {
+      // this callback may be called concurrently by multiple threads
+      // only do thread safe operations
+
+      try {
+        stub.notify(performer, receiver, hasFollowed);
+      } catch (RemoteException e) {
+        e.printStackTrace();
+      }
+
+      System.out.println(performer + " has " + (hasFollowed ? "followed" : "unfollowed") + " " + receiver);
+    });
 
     var walletThread = new Thread(winsome.makeWalletRunnable(2000L, 70).get());
     var persistenceThread = new Thread(winsome.makePersistenceRunnable(500L,
@@ -70,6 +99,10 @@ public class MainServer {
     } catch (InterruptedException e) {
       e.printStackTrace();
     }
+  }
+
+  private static void setUpRMI(Winsome winsome) {
+
   }
 
   private static void addJExpressHandlers(JExpress jexpress, ObjectMapper objectMapper, Winsome winsome) {

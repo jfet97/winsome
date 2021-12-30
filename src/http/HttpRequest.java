@@ -170,7 +170,7 @@ public class HttpRequest {
     // to reject the request — while not prohibited by the specification, the
     // semantics are undefined. It is better to just avoid sending payloads in GET
     // requests.
-    if (this.method.equals("GET") && !this.body.equals("")) {
+    if ((this.method.equals("GET") || this.method.equals("DELETE")) && !this.body.equals("")) {
       isValid = false;
     }
 

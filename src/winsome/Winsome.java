@@ -171,7 +171,7 @@ public class Winsome {
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
         .flatMap(u -> {
-          if (loggedUsers.remove(u.username)) {
+          if (loggedUsers.remove(u.username) != null) {
             return Either.<String, Void>right(null);
           } else {
             return Either.left("user was not logged");

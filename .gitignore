@@ -1,5 +1,5 @@
 .vscode
 bin
-**/tests/*.json
+**/*.json
 .DS_Store
 *.mp4

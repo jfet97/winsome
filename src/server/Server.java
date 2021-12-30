@@ -109,7 +109,8 @@ public class Server implements Runnable {
         // get a valid request instance
         var req = ereq.get();
 
-        var isGet = req.getMethod().equals("GET");
+        var method = req.getMethod();
+        var isGetOrDelete = method.equals("GET") || method.equals("DELETE");
         var contentLengthHeader = req.getHeaders().get("Content-Length");
         var isThereContentLengthHeader = contentLengthHeader != null;
 
@@ -143,12 +144,12 @@ public class Server implements Runnable {
             error = "malformed Content-Length header";
           }
 
-        } else if (!isGet) {
-          // if there is no Content-Length header and the request is not a GET request
-          // the server does not accept that request
+        } else if (!isGetOrDelete) {
+          // if there is no Content-Length header and the request is not a GET request nor
+          // a DELETE request the server does not accept that request
           error = "missing Content-Length header";
         } else {
-          // GET without payload: we have encountered the CR LF CR LF
+          // GET or DELETE without payload: we have encountered the CR LF CR LF
           // sequence => we have just read the whole request
           toRet = 0;
         }

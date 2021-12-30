@@ -2,6 +2,7 @@ package server;
 
 import java.io.File;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
@@ -34,14 +35,6 @@ public class MainServer {
   private static String FEED_ROUTE = "/feed";
   private static String COMMENTS_ROUTE = "/comments";
   private static String REACTIONS_ROUTE = "/reactions";
-
-  private static Either<String, String> listToJSONArray(ObjectMapper objectMapper, List<?> list) {
-    try {
-      return Either.right(objectMapper.writeValueAsString(list));
-    } catch (JsonProcessingException e) {
-      return Either.left(e.getMessage());
-    }
-  }
 
   public static void main(String[] args) {
 
@@ -309,7 +302,7 @@ public class MainServer {
 
         toRet = winsome
             .listUsers(user.username)
-            .flatMap(us -> listToJSONArray(objectMapper, us))
+            .map(us -> ToJSON.sequence(us.stream().map(ToJSON::toJSON).collect(Collectors.toList())))
             .flatMap(
                 jus -> HttpResponse.build200(Feedback.right(jus).toJSON(),
                     HttpResponse.MIME_APPLICATION_JSON, true))
@@ -344,7 +337,7 @@ public class MainServer {
         } else {
           toRet = winsome
               .listFollowers(user.username)
-              .flatMap(us -> listToJSONArray(objectMapper, us))
+              .map(us -> ToJSON.sequence(us.stream().map(ToJSON::toJSON).collect(Collectors.toList())))
               .flatMap(
                   jus -> HttpResponse.build200(Feedback.right(jus).toJSON(),
                       HttpResponse.MIME_APPLICATION_JSON, true))
@@ -378,7 +371,7 @@ public class MainServer {
         } else {
           toRet = winsome
               .listFollowing(user.username)
-              .flatMap(us -> listToJSONArray(objectMapper, us))
+              .map(us -> ToJSON.sequence(us.stream().map(ToJSON::toJSON).collect(Collectors.toList())))
               .flatMap(jus -> HttpResponse.build200(Feedback.right(jus).toJSON(),
                   HttpResponse.MIME_APPLICATION_JSON, true))
               .recoverWith(err -> HttpResponse.build400(
@@ -440,6 +433,38 @@ public class MainServer {
 
     // get the blog of a user
     jexpress.get(USERS_ROUTE + "/:user_id" + BLOG_ROUTE, (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+
+      try {
+        var user = (User) req.context;
+
+        // an user is authorized to see only its own blog
+        if (!user.username.equals(params.get("user_id"))) {
+          toRet = HttpResponse.build401(Feedback.error(ToJSON.toJSON("unauthorized")).toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON,
+              true);
+        } else {
+          toRet = winsome
+              .viewBlog(user.username)
+              .map(ps -> ps
+                  .stream()
+                  .map(p -> p.toJSON())
+                  .collect(Collectors.toList()))
+              .map(ps -> ToJSON.sequence(ps))
+              .flatMap(jps -> HttpResponse.build200(Feedback.right(jps).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
+        }
+
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
+      }
+
+      reply.accept(toRet);
 
     });
 

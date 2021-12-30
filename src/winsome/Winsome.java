@@ -188,7 +188,7 @@ public class Winsome {
         .map(u -> {
           return network.entrySet()
               .stream()
-              .filter(e -> e.getKey() != u.username && e.getValue().tags.stream().anyMatch(t -> u.tags.contains(t)))
+              .filter(e -> !e.getKey().equals(u.username) && e.getValue().tags.stream().anyMatch(t -> u.tags.contains(t)))
               .map(e -> e.getValue().username)
               .collect(Collectors.toList());
         });

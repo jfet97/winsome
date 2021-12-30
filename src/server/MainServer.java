@@ -115,7 +115,7 @@ public class MainServer {
 
       if (error) {
         var response = HttpResponse.build401(
-            Feedback.error(ToJSON.toJSON("unauthorized")).toJSON(),
+            Feedback.error(ToJSON.toJSON("unauthenticated user")).toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
 
         reply.accept(response);
@@ -228,7 +228,7 @@ public class MainServer {
 
         // an user is authorized to create posts only for itself
         if (!user.username.equals(params.get("user_id"))) {
-          toRet = HttpResponse.build401(
+          toRet = HttpResponse.build403(
               Feedback.error(
                   ToJSON.toJSON("unauthorized")).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON,
@@ -269,7 +269,7 @@ public class MainServer {
 
         // an user is authorized to delete only own posts
         if (!user.username.equals(params.get("user_id"))) {
-          toRet = HttpResponse.build401(
+          toRet = HttpResponse.build403(
               Feedback.error(
                   ToJSON.toJSON("unauthorized")).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON,
@@ -470,7 +470,7 @@ public class MainServer {
 
         // an user is authorized to see only its own followers
         if (!user.username.equals(params.get("user_id"))) {
-          toRet = HttpResponse.build401(
+          toRet = HttpResponse.build403(
               Feedback.error(
                   ToJSON.toJSON("unauthorized")).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON,
@@ -506,7 +506,7 @@ public class MainServer {
 
         // an user is authorized to see only which users are followed by him
         if (!user.username.equals(params.get("user_id"))) {
-          toRet = HttpResponse.build401(Feedback.error(ToJSON.toJSON("unauthorized")).toJSON(),
+          toRet = HttpResponse.build403(Feedback.error(ToJSON.toJSON("unauthorized")).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON,
               true);
         } else {
@@ -540,7 +540,7 @@ public class MainServer {
 
         // an user cannot force another user to follow someone
         if (!user.username.equals(params.get("user_id"))) {
-          toRet = HttpResponse.build401(
+          toRet = HttpResponse.build403(
               Feedback.error(
                   ToJSON.toJSON("unauthorized")).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON,
@@ -583,7 +583,7 @@ public class MainServer {
 
         // an user cannot force another user to unfollow someone
         if (!user.username.equals(params.get("user_id"))) {
-          toRet = HttpResponse.build401(
+          toRet = HttpResponse.build403(
               Feedback.error(
                   ToJSON.toJSON("unauthorized")).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON,
@@ -625,7 +625,7 @@ public class MainServer {
 
         // an user is authorized to see only its own blog
         if (!user.username.equals(params.get("user_id"))) {
-          toRet = HttpResponse.build401(Feedback.error(ToJSON.toJSON("unauthorized")).toJSON(),
+          toRet = HttpResponse.build403(Feedback.error(ToJSON.toJSON("unauthorized")).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON,
               true);
         } else {
@@ -662,7 +662,7 @@ public class MainServer {
 
         // an user is authorized to see only its own feed
         if (!user.username.equals(params.get("user_id"))) {
-          toRet = HttpResponse.build401(Feedback.error(ToJSON.toJSON("unauthorized")).toJSON(),
+          toRet = HttpResponse.build403(Feedback.error(ToJSON.toJSON("unauthorized")).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON,
               true);
         } else {
@@ -702,7 +702,7 @@ public class MainServer {
 
         // an user is authorized to see only its own wallet
         if (!user.username.equals(params.get("user_id"))) {
-          toRet = HttpResponse.build401(Feedback.error(ToJSON.toJSON("unauthorized")).toJSON(),
+          toRet = HttpResponse.build403(Feedback.error(ToJSON.toJSON("unauthorized")).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON,
               true);
         } else {

@@ -26,6 +26,7 @@ public class HttpResponse {
   public static final String[] CREATED_201 = { "201", "Created" };
   public static final String[] BAD_REQUEST_400 = { "400", "Bad Request" };
   public static final String[] UNAUTHORIZED_401 = { "401", "Unauthorized" };
+  public static final String[] FORBIDDEN_403 = { "401", "Forbidden" };
   public static final String[] NOT_FOUND_404 = { "404", "Not Found" };
   public static final String[] METHOD_NOT_ALLOWED_405 = { "405", "Method Not Allowed" };
   public static final String[] INTERNAL_SERVER_ERROR_500 = { "500", "Internal Server Error" };
@@ -201,6 +202,10 @@ public class HttpResponse {
 
   public static Either<String, HttpResponse> build401(String bodyN, String mime, Boolean keepAliveConnection) {
     return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.UNAUTHORIZED_401);
+  }
+
+  public static Either<String, HttpResponse> build403(String bodyN, String mime, Boolean keepAliveConnection) {
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.FORBIDDEN_403);
   }
 
   public static Either<String, HttpResponse> build404(String bodyN, String mime, Boolean keepAliveConnection) {

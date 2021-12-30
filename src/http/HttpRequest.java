@@ -1,5 +1,6 @@
 package http;
 
+import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -13,6 +14,7 @@ public class HttpRequest {
   private String requestTarget = "";
   private String HTTPVersion = "";
   private Map<String, String> headers = new HashMap<String, String>();
+  private Map<String, String> queryParams = new HashMap<String, String>();
   private String body = "";
   public Object context = null;
 
@@ -81,6 +83,26 @@ public class HttpRequest {
           }
           default: {
             errorMessage = instance.method + " is not yet supported by HttpRequest";
+          }
+        }
+
+        // parse query params (key=value pairs)
+        if (errorMessage.equals("") && instance.requestTarget.contains("?")) {
+          try {
+            var paramsString = instance.requestTarget.substring(instance.requestTarget.indexOf("?") + 1);
+            var pairs = paramsString.split("&");
+
+            Arrays.stream(pairs).forEach(pair -> {
+              try {
+                int idx = pair.indexOf("=");
+                var key = URLDecoder.decode(pair.substring(0, idx), "UTF-8");
+                var value = URLDecoder.decode(pair.substring(idx + 1), "UTF-8");
+
+                instance.queryParams.put(key, value);
+              } catch (Exception e) {
+              }
+            });
+          } catch (Exception e) {
           }
         }
 
@@ -203,7 +225,13 @@ public class HttpRequest {
   }
 
   public String getRequestTarget() {
-    return this.requestTarget;
+    // remove query params, if any
+    try {
+      return this.requestTarget.split("\\?")[0];
+    } catch (Exception e) {
+      e.printStackTrace();
+      return this.requestTarget;
+    }
   }
 
   public String getHTTPVersion() {
@@ -212,6 +240,10 @@ public class HttpRequest {
 
   public Map<String, String> getHeaders() {
     return Collections.unmodifiableMap(this.headers);
+  }
+
+  public Map<String, String> getQueryParams() {
+    return Collections.unmodifiableMap(this.queryParams);
   }
 
   public String getBody() {

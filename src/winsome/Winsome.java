@@ -188,7 +188,8 @@ public class Winsome {
         .map(u -> {
           return network.entrySet()
               .stream()
-              .filter(e -> !e.getKey().equals(u.username) && e.getValue().tags.stream().anyMatch(t -> u.tags.contains(t)))
+              .filter(
+                  e -> !e.getKey().equals(u.username) && e.getValue().tags.stream().anyMatch(t -> u.tags.contains(t)))
               .map(e -> e.getValue().username)
               .collect(Collectors.toList());
         });
@@ -286,6 +287,7 @@ public class Winsome {
   }
 
   public Either<String, Post> showPost(String username, String author, String postUuid) {
+    // it seems that any user can see any other user's post
 
     return nullGuard(username, "username")
         .flatMap(__ -> nullGuard(author, "author"))

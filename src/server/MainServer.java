@@ -301,8 +301,6 @@ public class MainServer {
         // authenticated user
         var user = (User) req.context;
 
-        // it seems that any user can see any other user's post
-
         toRet = winsome
             .showPost(user.username, params.get("user_id"), params.get("post_id"))
             .flatMap(p -> HttpResponse.build200(
@@ -312,6 +310,42 @@ public class MainServer {
                 Feedback.error(ToJSON.toJSON(err)).toJSON(),
                 HttpResponse.MIME_APPLICATION_JSON,
                 true));
+
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
+      }
+
+      reply.accept(toRet);
+    });
+
+    // rewin a post
+    jexpress.post(USERS_ROUTE + "/:user_id" + POSTS_ROUTE + "/:post_id", (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+      var queryParams = req.getQueryParams();
+
+      System.out.println(params.get("post_id"));
+
+      try {
+        // authenticated user
+        var user = (User) req.context;
+
+        if (queryParams.containsKey("rewin") && queryParams.get("rewin").equals("true")) {
+          toRet = winsome
+              .rewinPost(user.username, params.get("user_id"), params.get("post_id"))
+              .flatMap(p -> HttpResponse.build200(
+                  Feedback.right(p.toJSON()).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
+        } else {
+          toRet = HttpResponse.build400(
+              Feedback.error(ToJSON.toJSON("Missing 'rewin' param or 'rewin' param not true")).toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON,
+              true);
+        }
 
       } catch (Exception e) {
         toRet = Either.left(e.getMessage());

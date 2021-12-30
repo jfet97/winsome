@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -98,8 +99,8 @@ public class WinsomeToJsonTest {
     assertTrue(networkFromJSON.entrySet()
         .stream()
         .allMatch(e -> e.getValue().tags instanceof List<?> &&
-            e.getValue().followers instanceof List<?> &&
-            e.getValue().following instanceof List<?> &&
+            e.getValue().followers instanceof Set<?> &&
+            e.getValue().following instanceof Set<?> &&
             e.getValue().posts instanceof ConcurrentMap<?, ?>));
   }
 }

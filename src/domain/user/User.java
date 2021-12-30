@@ -1,7 +1,8 @@
 package domain.user;
 
-import java.util.LinkedList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
@@ -15,8 +16,8 @@ public class User {
   public String password;
   public List<String> tags;
   public ConcurrentMap<String, Post> posts; // <postUuid, Post>
-  public List<String> followers;
-  public List<String> following;
+  public Set<String> followers;
+  public Set<String> following;
 
   public static User of(String username, String password, List<String> tags) {
     var instance = new User();
@@ -25,8 +26,8 @@ public class User {
     instance.password = HashPassword.hash(password); // readonly
     instance.tags = tags; // readonly
     instance.posts = new ConcurrentHashMap<String, Post>();
-    instance.followers = new LinkedList<String>(); // needs manual synchronization
-    instance.following = new LinkedList<String>(); // needs manual synchronization
+    instance.followers = new HashSet<String>(); // needs manual synchronization
+    instance.following = new HashSet<String>(); // needs manual synchronization
 
     return instance;
   }

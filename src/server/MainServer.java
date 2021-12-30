@@ -23,6 +23,8 @@ import winsome.Winsome;
 public class MainServer {
 
   private static String USERS_ROUTE = "/users";
+  private static String FOLLOWERS_ROUTE = "/followers";
+  private static String FOLLOWING_ROUTE = "/following";
   private static String POSTS_ROUTE = "/posts";
   private static String LOGIN_ROUTE = "/login";
   private static String LOGOUT_ROUTE = "/logout";
@@ -266,7 +268,7 @@ public class MainServer {
       reply.accept(toRet);
     });
 
-    // get a list of users with at least one common tag
+    // get a list of users with at least one common tag with the requestor
     jexpress.get(USERS_ROUTE, (req, params, reply) -> {
 
       var toRet = Either.<String, HttpResponse>right(null);
@@ -280,6 +282,108 @@ public class MainServer {
             .flatMap(
                 jus -> HttpResponse.build200(Feedback.right(jus).toJSON(),
                     HttpResponse.MIME_APPLICATION_JSON, true));
+
+      } catch (Exception e) {
+        toRet = HttpResponse.build401(
+            Feedback.error(
+                Feedback.toJSON("invalid body: " + e.getMessage())).toJSON(),
+            HttpResponse.MIME_APPLICATION_JSON, true);
+      }
+
+      reply.accept(toRet);
+
+    });
+
+    // get a list of users which follows the requestor
+    jexpress.get(USERS_ROUTE + "/:user_id" + FOLLOWERS_ROUTE, (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+
+      try {
+        var user = (User) req.context;
+
+        // an user is authorized to see only its own followers
+        if (!user.username.equals(params.get("user_id"))) {
+          toRet = HttpResponse.build401(Feedback.error(Feedback.toJSON("unauthorized")).toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON,
+              true);
+        } else {
+          toRet = winsome
+              .listFollowers(user.username)
+              .flatMap(us -> listToJSONArray(objectMapper, us))
+              .flatMap(
+                  jus -> HttpResponse.build200(Feedback.right(jus).toJSON(),
+                      HttpResponse.MIME_APPLICATION_JSON, true));
+        }
+
+      } catch (Exception e) {
+        toRet = HttpResponse.build401(
+            Feedback.error(
+                Feedback.toJSON("invalid body: " + e.getMessage())).toJSON(),
+            HttpResponse.MIME_APPLICATION_JSON, true);
+      }
+
+      reply.accept(toRet);
+
+    });
+
+    // get a list of users followed by requestor
+    jexpress.get(USERS_ROUTE + "/:user_id" + FOLLOWING_ROUTE, (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+
+      try {
+        var user = (User) req.context;
+
+        // an user is authorized to see only which users are followed by him
+        if (!user.username.equals(params.get("user_id"))) {
+          toRet = HttpResponse.build401(Feedback.error(Feedback.toJSON("unauthorized")).toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON,
+              true);
+        } else {
+          toRet = winsome
+              .listFollowing(user.username)
+              .flatMap(us -> listToJSONArray(objectMapper, us))
+              .flatMap(
+                  jus -> HttpResponse.build200(Feedback.right(jus).toJSON(),
+                      HttpResponse.MIME_APPLICATION_JSON, true));
+        }
+
+      } catch (Exception e) {
+        toRet = HttpResponse.build401(
+            Feedback.error(
+                Feedback.toJSON("invalid body: " + e.getMessage())).toJSON(),
+            HttpResponse.MIME_APPLICATION_JSON, true);
+      }
+
+      reply.accept(toRet);
+
+    });
+
+    // follow an user
+    jexpress.post(USERS_ROUTE + "/:user_id" + FOLLOWING_ROUTE, (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+
+      try {
+        var user = (User) req.context;
+        var userToFollow = objectMapper.readValue(req.getBody(), User.class);
+
+        // an user cannot force another user to follow someone
+        if (!user.username.equals(params.get("user_id"))) {
+          toRet = HttpResponse.build401(Feedback.error(Feedback.toJSON("unauthorized")).toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON,
+              true);
+        } else {
+          toRet = winsome
+              .followUser(user.username, userToFollow.username)
+              .flatMap(
+                  __ -> HttpResponse.build200(
+                      Feedback.right(
+                          Feedback.toJSON("now " + user.username + " is following " + userToFollow.username))
+                          .toJSON(),
+                      HttpResponse.MIME_APPLICATION_JSON, true));
+        }
 
       } catch (Exception e) {
         toRet = HttpResponse.build401(

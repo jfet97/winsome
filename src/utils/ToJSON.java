@@ -12,7 +12,7 @@ public class ToJSON {
 
   public static String toJSON(String s) {
     return toJSONNoExcape(s
-        .replace("\"", "\'")
+        .replace("\"", "\\\"")
         .replace("\n", "\\n")
         .replace("\r", "\\r")
         .replace("\r\n", "\\r\\n"));

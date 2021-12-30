@@ -195,6 +195,10 @@ public class HttpResponse {
     return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.BAD_REQUEST_400);
   }
 
+  public static Either<String, HttpResponse> build401(String bodyN, String mime, Boolean keepAliveConnection) {
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.UNAUTHORIZED_401);
+  }
+
   public static Either<String, HttpResponse> build404(String bodyN, String mime, Boolean keepAliveConnection) {
     return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.NOT_FOUND_404);
   }

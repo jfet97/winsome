@@ -116,7 +116,8 @@ public class JExpress {
 
     if (request != null) {
       // get the handlers based on the request HTTP method
-      var handlers = this.routes.get(request.getMethod());
+      var method = request.getMethod();
+      var handlers = this.routes.get(method);
 
       if (handlers != null) {
         // the used HTTP method is supported
@@ -153,7 +154,8 @@ public class JExpress {
         } else {
 
           // not found a proper handler for the request target
-          var response = HttpResponse.build404(Feedback.error(target + " not found").toJSON(),
+          var response = HttpResponse.build404(
+              Feedback.error(method + " is not supported for route " + target).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON, true);
 
           resWrapper.value = response;
@@ -162,7 +164,7 @@ public class JExpress {
       } else {
 
         // this HTTP method is not supported
-        var response = HttpResponse.build404(Feedback.error(request.getMethod() + " not supported").toJSON(),
+        var response = HttpResponse.build404(Feedback.error(method + "is not supported").toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
 
         resWrapper.value = response;

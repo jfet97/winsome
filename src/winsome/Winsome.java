@@ -243,7 +243,6 @@ public class Winsome {
             return Either.left(username + " was already following " + usernameToFollow);
           }
 
-          
         });
   }
 
@@ -535,8 +534,14 @@ public class Winsome {
   }
 
   public Either<String, Runnable> makeWalletRunnable(Long interval, Integer authorPercentage) {
+    return this.makeWalletRunnable(interval, authorPercentage, () -> {
+    });
+  }
+
+  public Either<String, Runnable> makeWalletRunnable(Long interval, Integer authorPercentage, Runnable action) {
     return nullGuard(interval, "interval")
         .flatMap(__ -> nullGuard(authorPercentage, "authorPercentage"))
+        .flatMap(__ -> nullGuard(authorPercentage, "action"))
         .filterOrElse(p -> p >= 0 && p <= 100, p -> p + " is an invalid author percentage")
         .map(__ -> () -> {
           var interrupted = false;
@@ -546,6 +551,8 @@ public class Winsome {
             try {
 
               nowTimestamp.value = new Date().getTime();
+
+              var runAction = Wrapper.of(false);
 
               var posts = this.network
                   .entrySet()
@@ -619,10 +626,18 @@ public class Winsome {
                           .forEach(System.out::println));
 
                   post.incrementWalletScannerIteration();
+
+                  runAction.value = true;
                 }
               });
 
               this.wallet.prevTimestamp = nowTimestamp.value;
+
+              // run the action at the end of the wallet updating process
+              // if the gain of at least one post was computed
+              if (runAction.value) {
+                action.run();
+              }
 
               Thread.sleep(interval);
             } catch (InterruptedException e) {

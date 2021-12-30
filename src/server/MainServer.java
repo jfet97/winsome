@@ -1,6 +1,12 @@
 package server;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
@@ -41,30 +47,37 @@ public class MainServer {
   private static String REACTIONS_ROUTE = "/reactions";
   private static String WALLET_ROUTE = "/wallet";
 
-  public static void main(String[] args) throws RemoteException {
+  public static void main(String[] args) throws RemoteException, UnknownHostException, SocketException {
 
-    var port = 12345;
-    var remotePort = 23456;
+    // configs
+    var server_port = 12345;
     var remoteRegistryPort = 1789;
+    var udp_port = 6789;
+    var udp_ip = "239.255.32.32";
     var remoteName = "rmi://127.0.0.1:" + remoteRegistryPort;
-    var ip = "192.168.1.113";
+    var server_ip = "192.168.1.113";
+    var persistence_path = "/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/server/winsome.json";
+    var author_perc = 70;
+    var persistence_interval = 500L;
+    var wallet_interval = 2000L;
 
+    // main instances
     var objectMapper = new ObjectMapper()
         .enable(SerializationFeature.INDENT_OUTPUT);
-
     var jexpress = JExpress.of();
     var winsome = Winsome.of();
 
+    // restore the server status from the json file
     try {
       winsome = objectMapper.readValue(
-          new File("/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/server/winsome.json"), Winsome.class);
+          new File(persistence_path), Winsome.class);
     } catch (Exception e) {
     }
 
-    // RMI setup
+    // RMI configuration
     var remoteServer = RemoteServer.of(winsome);
 
-    var stub = (IRemoteServer) UnicastRemoteObject.exportObject(remoteServer, remotePort);
+    var stub = (IRemoteServer) UnicastRemoteObject.exportObject(remoteServer, 0);
     LocateRegistry.createRegistry(remoteRegistryPort);
     LocateRegistry.getRegistry(remoteRegistryPort).rebind(remoteName, stub);
 
@@ -82,13 +95,39 @@ public class MainServer {
       System.out.println(performer + " has " + (hasFollowed ? "followed" : "unfollowed") + " " + receiver);
     });
 
-    var walletThread = new Thread(winsome.makeWalletRunnable(2000L, 70).get());
-    var persistenceThread = new Thread(winsome.makePersistenceRunnable(500L,
-        "/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/server/winsome.json", false).get());
+    // multicast configuration
+    var ds = new DatagramSocket();
 
+    // create and check the validity of the multicast group
+    var multicastGroup = InetAddress.getByName(udp_ip);
+    if (!multicastGroup.isMulticastAddress()) {
+      ds.close();
+      throw new IllegalArgumentException(udp_ip + " is not a multicast address");
+    }
+
+    // wallet thread configuration
+    var walletThread = new Thread(winsome.makeWalletRunnable(wallet_interval, author_perc, () -> {
+      var notification = "push";
+      var notificationBytes = notification.getBytes();
+
+      var dp = new DatagramPacket(notificationBytes, notificationBytes.length, multicastGroup, udp_port);
+      try {
+        ds.send(dp);
+        System.out.println("notification pushed");
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }).get());
+
+    // persistence thread configuration
+    var persistenceThread = new Thread(
+        winsome.makePersistenceRunnable(persistence_interval, persistence_path, false).get());
+
+    // jexpress framework handlers
     addJExpressHandlers(jexpress, objectMapper, winsome);
 
-    var server = Server.of(jexpress, ip, port);
+    // server configuration
+    var server = Server.of(jexpress, server_ip, server_port);
     var serverThread = new Thread(server);
 
     serverThread.start();
@@ -99,6 +138,8 @@ public class MainServer {
     } catch (InterruptedException e) {
       e.printStackTrace();
     }
+
+    ds.close();
   }
 
   private static void setUpRMI(Winsome winsome) {

@@ -55,7 +55,11 @@ public class UserFactory {
 
       var uniqueTags = tags;
       if (errorMessage.equals("")) {
-        uniqueTags = tags.stream().distinct().filter(tag -> tag != null && !tag.equals("")).map(String::trim)
+        uniqueTags = tags.stream()
+            .distinct()
+            .filter(tag -> tag != null && !tag.equals(""))
+            .map(String::trim)
+            .map(t -> t.replaceAll("\n|\r|\r\n", ""))
             .collect(Collectors.toList());
 
         if (uniqueTags.size() > 5)

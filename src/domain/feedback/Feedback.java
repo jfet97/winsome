@@ -22,18 +22,6 @@ public class Feedback {
     return of(jsonRes, true);
   }
 
-  public static String toJSON(Boolean b) {
-    return b + "";
-  }
-
-  public static String toJSON(String s) {
-    return "\"" + s + "\"";
-  }
-
-  public static String toJSON(Number n) {
-    return n + "";
-  }
-
   public String toJSON() {
 
     return "{\"res\":" + this.jsonRes + ", \"ok\": " + this.isOk + "}";

@@ -19,7 +19,7 @@ public class PostFactory {
 
     private Validation<String, String> validateTitle(String title) {
       var errorMessage = "";
-      var titleTrimmed = title != null ? title.trim() : null;
+      var titleTrimmed = title != null ? title.trim().replaceAll("\n|\r|\r\n", "") : null;
 
       if (titleTrimmed == null)
         errorMessage = "title cannot be null";

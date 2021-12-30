@@ -20,7 +20,7 @@ public class CommentFactory {
 
     private Validation<String, String> validateText(String text) {
       var errorMessage = "";
-      var textTrimmed = text != null ? text.trim() : null;
+      var textTrimmed = text != null ? text.trim().replaceAll("\n|\r|\r\n", "") : null;
 
       if (textTrimmed == null)
         errorMessage = "text cannot be null";

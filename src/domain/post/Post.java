@@ -9,6 +9,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import domain.comment.Comment;
 import domain.reaction.Reaction;
+import utils.ToJSON;
 
 // ignore 'upvotes' and 'downvotes' that are not actual Post's fields
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -89,7 +90,7 @@ public class Post {
         "\"uuid\":" + "\"" + this.uuid + "\"" + ",",
         "\"timestamp\":" + this.timestamp + ",",
         "\"title\":" + "\"" + this.title + "\"" + ",",
-        "\"content\":" + "\"" + this.content + "\"" + ",",
+        "\"content\":" + ToJSON.toJSON(this.content) + ",",
         "\"author\":" + "\"" + this.author + "\"" + ",",
         "\"walletScannerIteration\":" + "\"" + this.getWalletScannerIteration() + "\"" + ",",
         "\"upvotes\":" + "\"" + this.getUpvotes() + "\"" + ",",

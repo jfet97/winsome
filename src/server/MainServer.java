@@ -7,6 +7,7 @@ import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
@@ -17,6 +18,7 @@ import http.HttpResponse;
 import io.vavr.control.Either;
 import jexpress.JExpress;
 import secrets.Secrets;
+import utils.ToJSON;
 import utils.Wrapper;
 import winsome.Winsome;
 
@@ -28,6 +30,10 @@ public class MainServer {
   private static String POSTS_ROUTE = "/posts";
   private static String LOGIN_ROUTE = "/login";
   private static String LOGOUT_ROUTE = "/logout";
+  private static String BLOG_ROUTE = "/blog";
+  private static String FEED_ROUTE = "/feed";
+  private static String COMMENTS_ROUTE = "/comments";
+  private static String REACTIONS_ROUTE = "/reactions";
 
   private static Either<String, String> listToJSONArray(ObjectMapper objectMapper, List<?> list) {
     try {
@@ -115,7 +121,7 @@ public class MainServer {
 
       if (error) {
         var response = HttpResponse.build401(
-            Feedback.error(Feedback.toJSON("unauthorized")).toJSON(),
+            Feedback.error(ToJSON.toJSON("unauthorized")).toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
 
         reply.accept(response);
@@ -141,16 +147,22 @@ public class MainServer {
             .register(user.username, user.password, user.tags)
             .flatMap(u -> HttpResponse.build201(
                 Feedback.right(
-                    Feedback.toJSON(user.username
+                    ToJSON.toJSON(user.username
                         + " is now part of the Winsome universe!"))
                     .toJSON(),
-                HttpResponse.MIME_APPLICATION_JSON, true));
+                HttpResponse.MIME_APPLICATION_JSON, true))
+            .recoverWith(err -> HttpResponse.build400(
+                Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                HttpResponse.MIME_APPLICATION_JSON,
+                true));
 
-      } catch (Exception e) {
-        toRet = HttpResponse.build401(
+      } catch (JsonProcessingException e) {
+        toRet = HttpResponse.build400(
             Feedback.error(
-                Feedback.toJSON("invalid body: " + e.getMessage())).toJSON(),
+                ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
       }
 
       reply.accept(toRet);
@@ -167,14 +179,20 @@ public class MainServer {
         toRet = winsome
             .login(user.username, user.password)
             .flatMap(jwt -> HttpResponse.build200(
-                Feedback.right(Feedback.toJSON(jwt)).toJSON(),
-                HttpResponse.MIME_APPLICATION_JSON, true));
+                Feedback.right(ToJSON.toJSON(jwt)).toJSON(),
+                HttpResponse.MIME_APPLICATION_JSON, true))
+            .recoverWith(err -> HttpResponse.build400(
+                Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                HttpResponse.MIME_APPLICATION_JSON,
+                true));
 
-      } catch (Exception e) {
-        toRet = HttpResponse.build401(
+      } catch (JsonProcessingException e) {
+        toRet = HttpResponse.build400(
             Feedback.error(
-                Feedback.toJSON("invalid body: " + e.getMessage())).toJSON(),
+                ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
       }
 
       reply.accept(toRet);
@@ -190,15 +208,17 @@ public class MainServer {
 
         toRet = winsome
             .logout(user.username)
-            .flatMap(
-                __ -> HttpResponse.build200(Feedback.right(Feedback.toJSON("logged out")).toJSON(),
-                    HttpResponse.MIME_APPLICATION_JSON, true));
+            .flatMap(__ -> HttpResponse.build200(
+                Feedback.right(
+                    ToJSON.toJSON("logged out")).toJSON(),
+                HttpResponse.MIME_APPLICATION_JSON, true))
+            .recoverWith(err -> HttpResponse.build400(
+                Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                HttpResponse.MIME_APPLICATION_JSON,
+                true));
 
       } catch (Exception e) {
-        toRet = HttpResponse.build401(
-            Feedback.error(
-                Feedback.toJSON("invalid body: " + e.getMessage())).toJSON(),
-            HttpResponse.MIME_APPLICATION_JSON, true);
+        toRet = Either.left(e.getMessage());
       }
 
       reply.accept(toRet);
@@ -214,7 +234,9 @@ public class MainServer {
 
         // an user is authorized to create posts only for itself
         if (!user.username.equals(params.get("user_id"))) {
-          toRet = HttpResponse.build401(Feedback.error(Feedback.toJSON("unauthorized")).toJSON(),
+          toRet = HttpResponse.build401(
+              Feedback.error(
+                  ToJSON.toJSON("unauthorized")).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON,
               true);
         } else {
@@ -224,14 +246,20 @@ public class MainServer {
               .createPost(user.username, post.title, post.content)
               .flatMap(
                   p -> HttpResponse.build200(Feedback.right(p.toJSON()).toJSON(),
-                      HttpResponse.MIME_APPLICATION_JSON, true));
+                      HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
         }
 
-      } catch (Exception e) {
-        toRet = HttpResponse.build401(
+      } catch (JsonProcessingException e) {
+        toRet = HttpResponse.build400(
             Feedback.error(
-                Feedback.toJSON("invalid body: " + e.getMessage())).toJSON(),
+                ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
       }
 
       reply.accept(toRet);
@@ -247,22 +275,25 @@ public class MainServer {
 
         // an user is authorized to delete only own posts
         if (!user.username.equals(params.get("user_id"))) {
-          toRet = HttpResponse.build401(Feedback.error(Feedback.toJSON("unauthorized")).toJSON(),
+          toRet = HttpResponse.build401(
+              Feedback.error(
+                  ToJSON.toJSON("unauthorized")).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON,
               true);
         } else {
           toRet = winsome
               .deletePost(user.username, params.get("post_id"))
-              .flatMap(
-                  p -> HttpResponse.build200(Feedback.right(p.toJSON()).toJSON(),
-                      HttpResponse.MIME_APPLICATION_JSON, true));
+              .flatMap(p -> HttpResponse.build200(
+                  Feedback.right(p.toJSON()).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
         }
 
       } catch (Exception e) {
-        toRet = HttpResponse.build401(
-            Feedback.error(
-                Feedback.toJSON("invalid body: " + e.getMessage())).toJSON(),
-            HttpResponse.MIME_APPLICATION_JSON, true);
+        toRet = Either.left(e.getMessage());
       }
 
       reply.accept(toRet);
@@ -281,13 +312,14 @@ public class MainServer {
             .flatMap(us -> listToJSONArray(objectMapper, us))
             .flatMap(
                 jus -> HttpResponse.build200(Feedback.right(jus).toJSON(),
-                    HttpResponse.MIME_APPLICATION_JSON, true));
+                    HttpResponse.MIME_APPLICATION_JSON, true))
+            .recoverWith(err -> HttpResponse.build400(
+                Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                HttpResponse.MIME_APPLICATION_JSON,
+                true));
 
       } catch (Exception e) {
-        toRet = HttpResponse.build401(
-            Feedback.error(
-                Feedback.toJSON("invalid body: " + e.getMessage())).toJSON(),
-            HttpResponse.MIME_APPLICATION_JSON, true);
+        toRet = Either.left(e.getMessage());
       }
 
       reply.accept(toRet);
@@ -304,7 +336,9 @@ public class MainServer {
 
         // an user is authorized to see only its own followers
         if (!user.username.equals(params.get("user_id"))) {
-          toRet = HttpResponse.build401(Feedback.error(Feedback.toJSON("unauthorized")).toJSON(),
+          toRet = HttpResponse.build401(
+              Feedback.error(
+                  ToJSON.toJSON("unauthorized")).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON,
               true);
         } else {
@@ -313,14 +347,15 @@ public class MainServer {
               .flatMap(us -> listToJSONArray(objectMapper, us))
               .flatMap(
                   jus -> HttpResponse.build200(Feedback.right(jus).toJSON(),
-                      HttpResponse.MIME_APPLICATION_JSON, true));
+                      HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
         }
 
       } catch (Exception e) {
-        toRet = HttpResponse.build401(
-            Feedback.error(
-                Feedback.toJSON("invalid body: " + e.getMessage())).toJSON(),
-            HttpResponse.MIME_APPLICATION_JSON, true);
+        toRet = Either.left(e.getMessage());
       }
 
       reply.accept(toRet);
@@ -337,23 +372,23 @@ public class MainServer {
 
         // an user is authorized to see only which users are followed by him
         if (!user.username.equals(params.get("user_id"))) {
-          toRet = HttpResponse.build401(Feedback.error(Feedback.toJSON("unauthorized")).toJSON(),
+          toRet = HttpResponse.build401(Feedback.error(ToJSON.toJSON("unauthorized")).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON,
               true);
         } else {
           toRet = winsome
               .listFollowing(user.username)
               .flatMap(us -> listToJSONArray(objectMapper, us))
-              .flatMap(
-                  jus -> HttpResponse.build200(Feedback.right(jus).toJSON(),
-                      HttpResponse.MIME_APPLICATION_JSON, true));
+              .flatMap(jus -> HttpResponse.build200(Feedback.right(jus).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
         }
 
       } catch (Exception e) {
-        toRet = HttpResponse.build401(
-            Feedback.error(
-                Feedback.toJSON("invalid body: " + e.getMessage())).toJSON(),
-            HttpResponse.MIME_APPLICATION_JSON, true);
+        toRet = Either.left(e.getMessage());
       }
 
       reply.accept(toRet);
@@ -371,28 +406,40 @@ public class MainServer {
 
         // an user cannot force another user to follow someone
         if (!user.username.equals(params.get("user_id"))) {
-          toRet = HttpResponse.build401(Feedback.error(Feedback.toJSON("unauthorized")).toJSON(),
+          toRet = HttpResponse.build401(
+              Feedback.error(
+                  ToJSON.toJSON("unauthorized")).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON,
               true);
         } else {
           toRet = winsome
               .followUser(user.username, userToFollow.username)
-              .flatMap(
-                  __ -> HttpResponse.build200(
-                      Feedback.right(
-                          Feedback.toJSON("now " + user.username + " is following " + userToFollow.username))
-                          .toJSON(),
-                      HttpResponse.MIME_APPLICATION_JSON, true));
+              .flatMap(__ -> HttpResponse.build200(
+                  Feedback.right(
+                      ToJSON.toJSON("now " + user.username + " is following " + userToFollow.username))
+                      .toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
         }
 
-      } catch (Exception e) {
-        toRet = HttpResponse.build401(
+      } catch (JsonProcessingException e) {
+        toRet = HttpResponse.build400(
             Feedback.error(
-                Feedback.toJSON("invalid body: " + e.getMessage())).toJSON(),
+                ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
       }
 
       reply.accept(toRet);
+
+    });
+
+    // get the blog of a user
+    jexpress.get(USERS_ROUTE + "/:user_id" + BLOG_ROUTE, (req, params, reply) -> {
 
     });
 

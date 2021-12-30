@@ -2,6 +2,8 @@ package domain.comment;
 
 import java.util.Date;
 
+import utils.ToJSON;
+
 public class Comment {
   public Long timestamp;
   public String text;
@@ -24,7 +26,7 @@ public class Comment {
 
     return String.join("",
         "{",
-        "\"text\":" + "\"" + this.text + "\"" + ",",
+        "\"text\":" + ToJSON.toJSON(this.text) + ",",
         "  \"timestamp\":" + this.timestamp + ",",
         "  \"postUuid\":" + "\"" + this.postUuid + "\"" + ",",
         "  \"author\":" + "\"" + this.author + "\"",

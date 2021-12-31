@@ -55,7 +55,7 @@ public class MainServer {
 
     // configs
     var tcp_port = 12345;
-    var remoteRegistryPort = 7777;
+    var remote_registry_port = 7777;
     var udp_port = 33333;
     var multicast_port = 44444;
     var multicast_ip = "239.255.32.32";
@@ -64,7 +64,7 @@ public class MainServer {
     var author_perc = 70;
     var persistence_interval = 500L;
     var wallet_interval = 2000L;
-    var stubName = "winsome-asc";
+    var stub_name = "winsome-asc";
 
     // main instances
     var objectMapper = new ObjectMapper()
@@ -80,7 +80,7 @@ public class MainServer {
     }
 
     // RMI configuration
-    var psr = configureRMI(winsome, remoteRegistryPort, stubName);
+    var psr = configureRMI(winsome, remote_registry_port, stub_name);
     var stub = psr.snd();
     var remoteServer = psr.fst();
 
@@ -97,7 +97,7 @@ public class MainServer {
     var persistenceThread = new Thread(configurePersistenceThread(winsome, persistence_interval, persistence_path));
 
     // jexpress framework handlers
-    configureJExpressHandlers(jexpress, objectMapper, winsome);
+    configureJExpressHandlers(jexpress, objectMapper, winsome, multicast_ip + ":" + multicast_port);
 
     // server configuration
     var server = Server.of(jexpress, server_ip, tcp_port);
@@ -115,6 +115,9 @@ public class MainServer {
 
     ds.close();
   }
+
+  // -----------------------------
+  // config methods
 
   private static Pair<RemoteServer, IRemoteServer> configureRMI(Winsome winsome, Integer remoteRegistryPort,
       String stubName)
@@ -193,16 +196,42 @@ public class MainServer {
     return winsome.makePersistenceRunnable(persistence_interval, persistence_path, false).get();
   }
 
-  private static void configureJExpressHandlers(JExpress jexpress, ObjectMapper objectMapper, Winsome winsome) {
+  private static void configureJExpressHandlers(JExpress jexpress, ObjectMapper objectMapper, Winsome winsome,
+      String multicastIpPort) {
 
     // auth middleware
+    configureJExpressAuthMiddleware(jexpress);
+
+    // multicast info
+    jexpress.get("/multicast", (req, params, reply) -> {
+      reply.accept(
+          HttpResponse.build200(
+              Feedback.right(
+                  ToJSON.toJSON(
+                      multicastIpPort))
+                  .toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON, true));
+    });
+
+    // users
+    configureJExpressUsersHandler(jexpress, objectMapper, winsome);
+
+    // login, logout
+    configureJExpressLoginLogoutHandlers(jexpress, objectMapper, winsome);
+
+    // posts
+    configureJExpressPostsHandlers(jexpress, objectMapper, winsome);
+
+  }
+
+  private static void configureJExpressAuthMiddleware(JExpress jexpress) {
     jexpress.use((req, params, reply, next) -> {
 
       var target = req.getRequestTarget();
       var method = req.getMethod();
       if (target.equals(LOGIN_ROUTE) || (target.equals(USERS_ROUTE) && method.equals("POST"))) {
         // auth not needed when a user tries to login
-        // auth not needed when a user tries to sign up
+        // auth not needed when a someone tries to sign up
         next.run();
       }
 
@@ -237,44 +266,10 @@ public class MainServer {
 
     });
 
-    // welcome page
-    jexpress.get("/", (req, params, reply) -> {
-      reply.accept(
-          HttpResponse.build200("<html><h1>Welcome to Winsome!</h1></html>", HttpResponse.MIME_TEXT_HTML, true));
-    });
+  }
 
-    // register new user
-    jexpress.post(USERS_ROUTE, (req, params, reply) -> {
-
-      var toRet = Either.<String, HttpResponse>right(null);
-
-      try {
-        var user = objectMapper.readValue(req.getBody(), User.class);
-
-        toRet = winsome
-            .register(user.username, user.password, user.tags)
-            .flatMap(u -> HttpResponse.build201(
-                Feedback.right(
-                    ToJSON.toJSON(user.username
-                        + " is now part of the Winsome universe!"))
-                    .toJSON(),
-                HttpResponse.MIME_APPLICATION_JSON, true))
-            .recoverWith(err -> HttpResponse.build400(
-                Feedback.error(ToJSON.toJSON(err)).toJSON(),
-                HttpResponse.MIME_APPLICATION_JSON,
-                true));
-
-      } catch (JsonProcessingException e) {
-        toRet = HttpResponse.build400(
-            Feedback.error(
-                ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
-            HttpResponse.MIME_APPLICATION_JSON, true);
-      } catch (Exception e) {
-        toRet = Either.left(e.getMessage());
-      }
-
-      reply.accept(toRet);
-    });
+  private static void configureJExpressLoginLogoutHandlers(JExpress jexpress, ObjectMapper objectMapper,
+      Winsome winsome) {
 
     // login
     jexpress.post(LOGIN_ROUTE, (req, params, reply) -> {
@@ -332,208 +327,30 @@ public class MainServer {
       reply.accept(toRet);
     });
 
-    // add new post
-    jexpress.post(USERS_ROUTE + "/:user_id" + POSTS_ROUTE, (req, params, reply) -> {
+  }
+
+  private static void configureJExpressUsersHandler(JExpress jexpress, ObjectMapper objectMapper, Winsome winsome) {
+
+    // signup
+    jexpress.post(USERS_ROUTE, (req, params, reply) -> {
 
       var toRet = Either.<String, HttpResponse>right(null);
 
       try {
-        var user = (User) req.context;
-
-        // an user is authorized to create posts only for itself
-        if (!user.username.equals(params.get("user_id"))) {
-          toRet = HttpResponse.build403(
-              Feedback.error(
-                  ToJSON.toJSON("unauthorized")).toJSON(),
-              HttpResponse.MIME_APPLICATION_JSON,
-              true);
-        } else {
-          var post = objectMapper.readValue(req.getBody(), Post.class);
-
-          toRet = winsome
-              .createPost(user.username, post.title, post.content)
-              .flatMap(
-                  p -> HttpResponse.build200(Feedback.right(p.toJSON()).toJSON(),
-                      HttpResponse.MIME_APPLICATION_JSON, true))
-              .recoverWith(err -> HttpResponse.build400(
-                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
-                  HttpResponse.MIME_APPLICATION_JSON,
-                  true));
-        }
-
-      } catch (JsonProcessingException e) {
-        toRet = HttpResponse.build400(
-            Feedback.error(
-                ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
-            HttpResponse.MIME_APPLICATION_JSON, true);
-      } catch (Exception e) {
-        toRet = Either.left(e.getMessage());
-      }
-
-      reply.accept(toRet);
-    });
-
-    // delete a post
-    jexpress.delete(USERS_ROUTE + "/:user_id" + POSTS_ROUTE + "/:post_id", (req, params, reply) -> {
-
-      var toRet = Either.<String, HttpResponse>right(null);
-
-      try {
-        var user = (User) req.context;
-
-        // an user is authorized to delete only own posts
-        if (!user.username.equals(params.get("user_id"))) {
-          toRet = HttpResponse.build403(
-              Feedback.error(
-                  ToJSON.toJSON("unauthorized")).toJSON(),
-              HttpResponse.MIME_APPLICATION_JSON,
-              true);
-        } else {
-          toRet = winsome
-              .deletePost(user.username, params.get("post_id"))
-              .flatMap(p -> HttpResponse.build200(
-                  Feedback.right(p.toJSON()).toJSON(),
-                  HttpResponse.MIME_APPLICATION_JSON, true))
-              .recoverWith(err -> HttpResponse.build400(
-                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
-                  HttpResponse.MIME_APPLICATION_JSON,
-                  true));
-        }
-
-      } catch (Exception e) {
-        toRet = Either.left(e.getMessage());
-      }
-
-      reply.accept(toRet);
-    });
-
-    // view a post
-    jexpress.get(USERS_ROUTE + "/:user_id" + POSTS_ROUTE + "/:post_id", (req, params, reply) -> {
-
-      var toRet = Either.<String, HttpResponse>right(null);
-
-      try {
-        // authenticated user
-        var user = (User) req.context;
+        var user = objectMapper.readValue(req.getBody(), User.class);
 
         toRet = winsome
-            .showPost(user.username, params.get("user_id"), params.get("post_id"))
-            .flatMap(p -> HttpResponse.build200(
-                Feedback.right(p.toJSON()).toJSON(),
+            .register(user.username, user.password, user.tags)
+            .flatMap(u -> HttpResponse.build201(
+                Feedback.right(
+                    ToJSON.toJSON(user.username
+                        + " is now part of the Winsome universe!"))
+                    .toJSON(),
                 HttpResponse.MIME_APPLICATION_JSON, true))
             .recoverWith(err -> HttpResponse.build400(
                 Feedback.error(ToJSON.toJSON(err)).toJSON(),
                 HttpResponse.MIME_APPLICATION_JSON,
                 true));
-
-      } catch (Exception e) {
-        toRet = Either.left(e.getMessage());
-      }
-
-      reply.accept(toRet);
-    });
-
-    // rewin a post
-    jexpress.post(USERS_ROUTE + "/:user_id" + POSTS_ROUTE + "/:post_id", (req, params, reply) -> {
-
-      var toRet = Either.<String, HttpResponse>right(null);
-      var queryParams = req.getQueryParams();
-
-      try {
-        // authenticated user
-        var user = (User) req.context;
-
-        if (queryParams.containsKey("rewin") && queryParams.get("rewin").equals("true")) {
-          toRet = winsome
-              .rewinPost(user.username, params.get("user_id"), params.get("post_id"))
-              .flatMap(p -> HttpResponse.build200(
-                  Feedback.right(p.toJSON()).toJSON(),
-                  HttpResponse.MIME_APPLICATION_JSON, true))
-              .recoverWith(err -> HttpResponse.build400(
-                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
-                  HttpResponse.MIME_APPLICATION_JSON,
-                  true));
-        } else {
-          toRet = HttpResponse.build400(
-              Feedback.error(ToJSON.toJSON("Missing 'rewin' param or 'rewin' param not true")).toJSON(),
-              HttpResponse.MIME_APPLICATION_JSON,
-              true);
-        }
-
-      } catch (Exception e) {
-        toRet = Either.left(e.getMessage());
-      }
-
-      reply.accept(toRet);
-    });
-
-    // add a reaction to a post
-    jexpress.post(USERS_ROUTE + "/:user_id" + POSTS_ROUTE + "/:post_id" + REACTIONS_ROUTE, (req, params, reply) -> {
-
-      var toRet = Either.<String, HttpResponse>right(null);
-
-      try {
-        // authenticated user
-        var user = (User) req.context;
-
-        var reaction = objectMapper.readValue(req.getBody(), Reaction.class);
-
-        if (reaction.isUpvote != null && reaction.isUpvote instanceof Boolean) {
-          toRet = winsome
-              .ratePost(user.username, params.get("user_id"), params.get("post_id"), reaction.isUpvote)
-              .flatMap(r -> HttpResponse.build200(
-                  Feedback.right(r.toJSON()).toJSON(),
-                  HttpResponse.MIME_APPLICATION_JSON, true))
-              .recoverWith(err -> HttpResponse.build400(
-                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
-                  HttpResponse.MIME_APPLICATION_JSON,
-                  true));
-        } else {
-          toRet = HttpResponse.build400(
-              Feedback.error(ToJSON.toJSON("Missing boolean 'isUpvote' field")).toJSON(),
-              HttpResponse.MIME_APPLICATION_JSON,
-              true);
-        }
-
-      } catch (JsonProcessingException e) {
-        toRet = HttpResponse.build400(
-            Feedback.error(
-                ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
-            HttpResponse.MIME_APPLICATION_JSON, true);
-      } catch (Exception e) {
-        toRet = Either.left(e.getMessage());
-      }
-
-      reply.accept(toRet);
-    });
-
-    // add a comment to a post
-    jexpress.post(USERS_ROUTE + "/:user_id" + POSTS_ROUTE + "/:post_id" + COMMENTS_ROUTE, (req, params, reply) -> {
-
-      var toRet = Either.<String, HttpResponse>right(null);
-
-      try {
-        // authenticated user
-        var user = (User) req.context;
-
-        var comment = objectMapper.readValue(req.getBody(), Comment.class);
-
-        if (comment.text != null && comment.text instanceof String) {
-          toRet = winsome
-              .addComment(user.username, params.get("user_id"), params.get("post_id"), comment.text)
-              .flatMap(c -> HttpResponse.build200(
-                  Feedback.right(c.toJSON()).toJSON(),
-                  HttpResponse.MIME_APPLICATION_JSON, true))
-              .recoverWith(err -> HttpResponse.build400(
-                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
-                  HttpResponse.MIME_APPLICATION_JSON,
-                  true));
-        } else {
-          toRet = HttpResponse.build400(
-              Feedback.error(ToJSON.toJSON("Missing string 'text' field")).toJSON(),
-              HttpResponse.MIME_APPLICATION_JSON,
-              true);
-        }
 
       } catch (JsonProcessingException e) {
         toRet = HttpResponse.build400(
@@ -853,6 +670,225 @@ public class MainServer {
 
       reply.accept(toRet);
 
+    });
+
+  }
+
+  private static void configureJExpressPostsHandlers(JExpress jexpress, ObjectMapper objectMapper, Winsome winsome) {
+
+    // add new post
+    jexpress.post(USERS_ROUTE + "/:user_id" + POSTS_ROUTE, (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+
+      try {
+        var user = (User) req.context;
+
+        // an user is authorized to create posts only for itself
+        if (!user.username.equals(params.get("user_id"))) {
+          toRet = HttpResponse.build403(
+              Feedback.error(
+                  ToJSON.toJSON("unauthorized")).toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON,
+              true);
+        } else {
+          var post = objectMapper.readValue(req.getBody(), Post.class);
+
+          toRet = winsome
+              .createPost(user.username, post.title, post.content)
+              .flatMap(
+                  p -> HttpResponse.build200(Feedback.right(p.toJSON()).toJSON(),
+                      HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
+        }
+
+      } catch (JsonProcessingException e) {
+        toRet = HttpResponse.build400(
+            Feedback.error(
+                ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
+            HttpResponse.MIME_APPLICATION_JSON, true);
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
+      }
+
+      reply.accept(toRet);
+    });
+
+    // delete a post
+    jexpress.delete(USERS_ROUTE + "/:user_id" + POSTS_ROUTE + "/:post_id", (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+
+      try {
+        var user = (User) req.context;
+
+        // an user is authorized to delete only own posts
+        if (!user.username.equals(params.get("user_id"))) {
+          toRet = HttpResponse.build403(
+              Feedback.error(
+                  ToJSON.toJSON("unauthorized")).toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON,
+              true);
+        } else {
+          toRet = winsome
+              .deletePost(user.username, params.get("post_id"))
+              .flatMap(p -> HttpResponse.build200(
+                  Feedback.right(p.toJSON()).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
+        }
+
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
+      }
+
+      reply.accept(toRet);
+    });
+
+    // view a post
+    jexpress.get(USERS_ROUTE + "/:user_id" + POSTS_ROUTE + "/:post_id", (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+
+      try {
+        // authenticated user
+        var user = (User) req.context;
+
+        toRet = winsome
+            .showPost(user.username, params.get("user_id"), params.get("post_id"))
+            .flatMap(p -> HttpResponse.build200(
+                Feedback.right(p.toJSON()).toJSON(),
+                HttpResponse.MIME_APPLICATION_JSON, true))
+            .recoverWith(err -> HttpResponse.build400(
+                Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                HttpResponse.MIME_APPLICATION_JSON,
+                true));
+
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
+      }
+
+      reply.accept(toRet);
+    });
+
+    // rewin a post
+    jexpress.post(USERS_ROUTE + "/:user_id" + POSTS_ROUTE + "/:post_id", (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+      var queryParams = req.getQueryParams();
+
+      try {
+        // authenticated user
+        var user = (User) req.context;
+
+        if (queryParams.containsKey("rewin") && queryParams.get("rewin").equals("true")) {
+          toRet = winsome
+              .rewinPost(user.username, params.get("user_id"), params.get("post_id"))
+              .flatMap(p -> HttpResponse.build200(
+                  Feedback.right(p.toJSON()).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
+        } else {
+          toRet = HttpResponse.build400(
+              Feedback.error(ToJSON.toJSON("Missing 'rewin' param or 'rewin' param not true")).toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON,
+              true);
+        }
+
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
+      }
+
+      reply.accept(toRet);
+    });
+
+    // add a reaction to a post
+    jexpress.post(USERS_ROUTE + "/:user_id" + POSTS_ROUTE + "/:post_id" + REACTIONS_ROUTE, (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+
+      try {
+        // authenticated user
+        var user = (User) req.context;
+
+        var reaction = objectMapper.readValue(req.getBody(), Reaction.class);
+
+        if (reaction.isUpvote != null && reaction.isUpvote instanceof Boolean) {
+          toRet = winsome
+              .ratePost(user.username, params.get("user_id"), params.get("post_id"), reaction.isUpvote)
+              .flatMap(r -> HttpResponse.build200(
+                  Feedback.right(r.toJSON()).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
+        } else {
+          toRet = HttpResponse.build400(
+              Feedback.error(ToJSON.toJSON("Missing boolean 'isUpvote' field")).toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON,
+              true);
+        }
+
+      } catch (JsonProcessingException e) {
+        toRet = HttpResponse.build400(
+            Feedback.error(
+                ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
+            HttpResponse.MIME_APPLICATION_JSON, true);
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
+      }
+
+      reply.accept(toRet);
+    });
+
+    // add a comment to a post
+    jexpress.post(USERS_ROUTE + "/:user_id" + POSTS_ROUTE + "/:post_id" + COMMENTS_ROUTE, (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+
+      try {
+        // authenticated user
+        var user = (User) req.context;
+
+        var comment = objectMapper.readValue(req.getBody(), Comment.class);
+
+        if (comment.text != null && comment.text instanceof String) {
+          toRet = winsome
+              .addComment(user.username, params.get("user_id"), params.get("post_id"), comment.text)
+              .flatMap(c -> HttpResponse.build200(
+                  Feedback.right(c.toJSON()).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
+        } else {
+          toRet = HttpResponse.build400(
+              Feedback.error(ToJSON.toJSON("Missing string 'text' field")).toJSON(),
+              HttpResponse.MIME_APPLICATION_JSON,
+              true);
+        }
+
+      } catch (JsonProcessingException e) {
+        toRet = HttpResponse.build400(
+            Feedback.error(
+                ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
+            HttpResponse.MIME_APPLICATION_JSON, true);
+      } catch (Exception e) {
+        toRet = Either.left(e.getMessage());
+      }
+
+      reply.accept(toRet);
     });
 
   }

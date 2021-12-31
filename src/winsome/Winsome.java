@@ -158,8 +158,9 @@ public class Winsome {
           if (currJWT == null) {
             return WinsomeJWT.wrapWithMessageJSON(newjwt, "user successfully logged");
           } else {
-            // always send back the refreshed token
-            return WinsomeJWT.wrapWithMessageJSON(newjwt, "user was already logged");
+            // always send back the refreshed token, but creates an error
+            return WinsomeJWT.wrapWithMessageJSON(newjwt, "user was already logged")
+                .flatMap(json -> Either.left(json));
           }
         });
   }

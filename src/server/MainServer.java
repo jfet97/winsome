@@ -240,7 +240,7 @@ public class MainServer {
                 Feedback.right(jwtJSON).toJSON(),
                 HttpResponse.MIME_APPLICATION_JSON, true))
             .recoverWith(err -> HttpResponse.build400(
-                Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                Feedback.error(err.contains("jwt") && err.contains("message") ? err : ToJSON.toJSON(err)).toJSON(),
                 HttpResponse.MIME_APPLICATION_JSON,
                 true));
 

@@ -76,7 +76,12 @@ public class MainServer {
     try {
       winsome = objectMapper.readValue(
           new File(persistence_path), Winsome.class);
+
+      // if jackson has put null somewhere because of an invalid
+      // json file, an exception will be raised
+      winsome.toJSON();
     } catch (Exception e) {
+      winsome = Winsome.of();
     }
 
     // RMI configuration

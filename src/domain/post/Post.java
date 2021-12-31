@@ -19,6 +19,7 @@ public class Post {
   public String title;
   public String content;
   public String author;
+  public List<Post> rewins;
   public List<Comment> comments;
   public List<Reaction> reactions;
   public Long walletScannerIteration;
@@ -32,6 +33,7 @@ public class Post {
     instance.title = title; // readonly
     instance.content = content; // readonly
     instance.author = author; // readonly
+    instance.rewins = new LinkedList<Post>(); // needs manual synchronization
     instance.comments = new LinkedList<Comment>(); // needs manual synchronization
     instance.reactions = new LinkedList<Reaction>(); // needs manual synchronization
     instance.walletScannerIteration = 1L; // needs manual synchronization (wallet thread and persistence thread)
@@ -85,6 +87,15 @@ public class Post {
     }
     reactionsLine += "]";
 
+    var rewinsLine = "\"rewins\":[";
+    synchronized (this.rewins) {
+      rewinsLine += this.rewins
+          .stream()
+          .map(p -> ToJSON.toJSON(p.uuid))
+          .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
+    }
+    rewinsLine += "]";
+
     return String.join("",
         "{",
         "\"uuid\":" + "\"" + this.uuid + "\"" + ",",
@@ -95,6 +106,7 @@ public class Post {
         "\"walletScannerIteration\":" + "\"" + this.getWalletScannerIteration() + "\"" + ",",
         "\"upvotes\":" + "\"" + this.getUpvotes() + "\"" + ",",
         "\"downvotes\":" + "\"" + this.getDownvotes() + "\"" + ",",
+        rewinsLine + ",",
         commentsLine + ",",
         reactionsLine,
         "}");

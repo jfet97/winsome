@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.rmi.RemoteException;
@@ -53,7 +54,7 @@ public class MainServer {
   public static void main(String[] args) throws RemoteException, UnknownHostException, SocketException {
 
     // configs
-    var tcp_port = 6666;
+    var tcp_port = 12345;
     var remoteRegistryPort = 7777;
     var udp_port = 33333;
     var multicast_port = 44444;
@@ -84,40 +85,25 @@ public class MainServer {
     var remoteServer = psr.fst();
 
     // multicast configuration
-    var ds = new DatagramSocket(udp_port);
-
-    // create and check the validity of the multicast group
-    var multicastGroup = InetAddress.getByName(multicast_ip);
-    if (!multicastGroup.isMulticastAddress()) {
-      ds.close();
-      throw new IllegalArgumentException(multicast_ip + " is not a multicast address");
-    }
+    var pdm = configureMulticast(udp_port, multicast_ip);
+    var ds = pdm.fst();
+    var multicastGroup = pdm.snd();
 
     // wallet thread configuration
-    var walletThread = new Thread(winsome.makeWalletRunnable(wallet_interval, author_perc, () -> {
-      var notification = "push";
-      var notificationBytes = notification.getBytes();
-
-      var dp = new DatagramPacket(notificationBytes, notificationBytes.length, multicastGroup, multicast_port);
-      try {
-        ds.send(dp);
-        System.out.println("notification pushed");
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
-    }).get());
+    var walletThread = new Thread(
+        configureWalletThread(winsome, wallet_interval, author_perc, multicastGroup, multicast_port, ds));
 
     // persistence thread configuration
-    var persistenceThread = new Thread(
-        winsome.makePersistenceRunnable(persistence_interval, persistence_path, false).get());
+    var persistenceThread = new Thread(configurePersistenceThread(winsome, persistence_interval, persistence_path));
 
     // jexpress framework handlers
-    addJExpressHandlers(jexpress, objectMapper, winsome);
+    configureJExpressHandlers(jexpress, objectMapper, winsome);
 
     // server configuration
     var server = Server.of(jexpress, server_ip, tcp_port);
     var serverThread = new Thread(server);
 
+    // start threads
     serverThread.start();
     walletThread.start();
     persistenceThread.start();
@@ -170,7 +156,44 @@ public class MainServer {
     return Pair.of(remoteServerWrapped.value, stub);
   }
 
-  private static void addJExpressHandlers(JExpress jexpress, ObjectMapper objectMapper, Winsome winsome) {
+  private static Pair<DatagramSocket, InetAddress> configureMulticast(Integer udp_port, String multicast_ip)
+      throws UnknownHostException, SocketException {
+
+    try (var ds = new DatagramSocket(udp_port);) {
+
+      // create and check the validity of the multicast group
+      var multicastGroup = InetAddress.getByName(multicast_ip);
+      if (!multicastGroup.isMulticastAddress()) {
+        ds.close();
+        throw new IllegalArgumentException(multicast_ip + " is not a multicast address");
+      }
+
+      return Pair.of(ds, multicastGroup);
+    }
+  }
+
+  private static Runnable configureWalletThread(Winsome winsome, Long wallet_interval, Integer author_perc,
+      InetAddress multicastGroup, Integer multicast_port, DatagramSocket ds) {
+    return winsome.makeWalletRunnable(wallet_interval, author_perc, () -> {
+      var notification = "push";
+      var notificationBytes = notification.getBytes();
+
+      var dp = new DatagramPacket(notificationBytes, notificationBytes.length, multicastGroup, multicast_port);
+      try {
+        ds.send(dp);
+        System.out.println("notification pushed");
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }).get();
+  }
+
+  private static Runnable configurePersistenceThread(Winsome winsome, Long persistence_interval,
+      String persistence_path) {
+    return winsome.makePersistenceRunnable(persistence_interval, persistence_path, false).get();
+  }
+
+  private static void configureJExpressHandlers(JExpress jexpress, ObjectMapper objectMapper, Winsome winsome) {
 
     // auth middleware
     jexpress.use((req, params, reply, next) -> {

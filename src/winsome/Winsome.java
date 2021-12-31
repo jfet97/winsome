@@ -656,7 +656,7 @@ public class Winsome {
     var loggedUsersLine = "\"loggedUsers\":{";
     loggedUsersLine += this.loggedUsers.entrySet()
         .stream()
-        .map(e -> "\"" + e.getKey() + "\":" + e.getValue())
+        .map(e -> "\"" + e.getKey() + "\":\"" + e.getValue() + "\"")
         .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
     loggedUsersLine += "}";
 

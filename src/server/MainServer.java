@@ -53,16 +53,17 @@ public class MainServer {
   public static void main(String[] args) throws RemoteException, UnknownHostException, SocketException {
 
     // configs
-    var server_port = 12345;
-    var remoteRegistryPort = 1789;
-    var udp_port = 6789;
-    var udp_ip = "239.255.32.32";
-    var remoteName = "rmi://127.0.0.1:" + remoteRegistryPort;
+    var tcp_port = 6666;
+    var remoteRegistryPort = 7777;
+    var udp_port = 33333;
+    var multicast_port = 44444;
+    var multicast_ip = "239.255.32.32";
     var server_ip = "192.168.1.113";
     var persistence_path = "/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/server/winsome.json";
     var author_perc = 70;
     var persistence_interval = 500L;
     var wallet_interval = 2000L;
+    var stubName = "winsome-asc";
 
     // main instances
     var objectMapper = new ObjectMapper()
@@ -78,30 +79,18 @@ public class MainServer {
     }
 
     // RMI configuration
-    var psr = configureRMI(winsome, remoteRegistryPort, remoteName);
+    var psr = configureRMI(winsome, remoteRegistryPort, stubName);
     var stub = psr.snd();
     var remoteServer = psr.fst();
 
-    winsome.setOnChangeFollowers((performer, receiver, hasFollowed) -> {
-      // this callback may be called concurrently by multiple threads
-      // only do thread safe operations
-
-      try {
-        remoteServer.notify(performer, receiver, hasFollowed);
-      } catch (RemoteException e) {
-        e.printStackTrace();
-      }
-
-    });
-
     // multicast configuration
-    var ds = new DatagramSocket();
+    var ds = new DatagramSocket(udp_port);
 
     // create and check the validity of the multicast group
-    var multicastGroup = InetAddress.getByName(udp_ip);
+    var multicastGroup = InetAddress.getByName(multicast_ip);
     if (!multicastGroup.isMulticastAddress()) {
       ds.close();
-      throw new IllegalArgumentException(udp_ip + " is not a multicast address");
+      throw new IllegalArgumentException(multicast_ip + " is not a multicast address");
     }
 
     // wallet thread configuration
@@ -109,7 +98,7 @@ public class MainServer {
       var notification = "push";
       var notificationBytes = notification.getBytes();
 
-      var dp = new DatagramPacket(notificationBytes, notificationBytes.length, multicastGroup, udp_port);
+      var dp = new DatagramPacket(notificationBytes, notificationBytes.length, multicastGroup, multicast_port);
       try {
         ds.send(dp);
         System.out.println("notification pushed");
@@ -126,7 +115,7 @@ public class MainServer {
     addJExpressHandlers(jexpress, objectMapper, winsome);
 
     // server configuration
-    var server = Server.of(jexpress, server_ip, server_port);
+    var server = Server.of(jexpress, server_ip, tcp_port);
     var serverThread = new Thread(server);
 
     serverThread.start();
@@ -142,14 +131,14 @@ public class MainServer {
   }
 
   private static Pair<RemoteServer, IRemoteServer> configureRMI(Winsome winsome, Integer remoteRegistryPort,
-      String remoteName)
+      String stubName)
       throws RemoteException {
 
     var remoteServerWrapped = Wrapper.<RemoteServer>of(null);
 
     remoteServerWrapped.value = RemoteServer.of(winsome, username -> {
 
-      // when a new user login, send to him all its current followers
+      // when a new user log in, send to him all its current followers
       // replacing whatever the client had before
       winsome.synchronizedActionOnFollowersOfUser(username, fs -> {
         try {
@@ -163,7 +152,20 @@ public class MainServer {
 
     var stub = (IRemoteServer) UnicastRemoteObject.exportObject(remoteServerWrapped.value, 0);
     LocateRegistry.createRegistry(remoteRegistryPort);
-    LocateRegistry.getRegistry(remoteRegistryPort).rebind(remoteName, stub);
+    LocateRegistry.getRegistry(remoteRegistryPort).rebind(stubName, stub);
+
+    // when the set of followers of an user changes, notify the user
+    winsome.setOnChangeFollowers((performer, receiver, hasFollowed) -> {
+      // this callback may be called concurrently by multiple threads
+      // only do thread safe operations
+
+      try {
+        remoteServerWrapped.value.notify(performer, receiver, hasFollowed);
+      } catch (RemoteException e) {
+        e.printStackTrace();
+      }
+
+    });
 
     return Pair.of(remoteServerWrapped.value, stub);
   }

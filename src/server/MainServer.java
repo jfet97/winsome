@@ -81,6 +81,7 @@ public class MainServer {
       // json file, an exception will be raised
       winsome.toJSON();
     } catch (Exception e) {
+      e.printStackTrace();
       winsome = Winsome.of();
     }
 

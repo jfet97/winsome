@@ -25,6 +25,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import domain.comment.Comment;
 import domain.comment.CommentFactory;
 import domain.jwt.WinsomeJWT;
+import domain.post.AuthorPostUuidPair;
 import domain.post.Post;
 import domain.post.PostFactory;
 import domain.reaction.Reaction;
@@ -218,6 +219,7 @@ public class Winsome {
 
     return nullGuard(username, "username")
         .flatMap(__ -> nullGuard(usernameToFollow, "usernameToFollow"))
+        .flatMap(__ -> username == usernameToFollow ? Either.left("an user cannot follow itself") : Either.right(null))
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .flatMap(u -> u == null ? Either.left("unknown user " + username)
             : Either.<String, User>right(network.get(usernameToFollow))
@@ -335,10 +337,20 @@ public class Winsome {
           var post = u.posts.get(postUuid);
           var toRet = Either.<String, Post>right(post);
 
-          if (post != null)
-            u.posts.remove(post.uuid);
-          else
+          if (post != null) {
+            synchronized (post) {
+              // synchronized with rewinPost
+              post.justDeleted = true;
+
+              post.rewins
+                  .stream()
+                  .forEach(p -> deletePost(p.author, p.postUuid));
+
+              u.posts.remove(post.uuid);
+            }
+          } else {
             toRet = Either.left("unknown post");
+          }
 
           return toRet;
         });
@@ -358,17 +370,35 @@ public class Winsome {
         .flatMap(
             t -> t.fst().username.equals(t.snd().username) ? Either.left("cannot rewin own post") : Either.right(t))
         .flatMap(t -> {
-          var u = t.fst();
-          var a = t.snd();
+          var user = t.fst();
+          var ath = t.snd();
 
-          synchronized (u.following) {
-            if (!u.following.contains(a.username))
+          synchronized (user.following) {
+            if (!user.following.contains(ath.username))
               return Either.left("cannot rewin post not in feed");
             else
               return Either.right(t);
           }
         })
-        .flatMap(t -> makePost(t.fst().username, t.trd().title, t.trd().content));
+        .flatMap(t -> {
+          var user = t.fst();
+          var post = t.trd();
+          var toRet = Either.<String, Post>right(null);
+
+          synchronized (post) {
+            // synchronized with deletePost
+
+            if (post.justDeleted) {
+              toRet = Either.left("the post has just been deleted");
+            } else {
+              toRet = makePost(user.username, post.title, post.content);
+              toRet.forEach(p -> post.rewins.add(AuthorPostUuidPair.of(p.author, p.uuid)));
+            }
+          }
+
+          return toRet;
+
+        });
   }
 
   public Either<String, Reaction> ratePost(String username, String author, String postUuid, Boolean isUpvote) {

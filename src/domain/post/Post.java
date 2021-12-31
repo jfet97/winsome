@@ -19,7 +19,8 @@ public class Post {
   public String title;
   public String content;
   public String author;
-  public List<Post> rewins;
+  public Boolean justDeleted;
+  public List<AuthorPostUuidPair> rewins; // Pair<author, postUuid>
   public List<Comment> comments;
   public List<Reaction> reactions;
   public Long walletScannerIteration;
@@ -33,7 +34,8 @@ public class Post {
     instance.title = title; // readonly
     instance.content = content; // readonly
     instance.author = author; // readonly
-    instance.rewins = new LinkedList<Post>(); // needs manual synchronization
+    instance.justDeleted = false; // needs manual synchronization
+    instance.rewins = new LinkedList<AuthorPostUuidPair>(); // needs manual synchronization
     instance.comments = new LinkedList<Comment>(); // needs manual synchronization
     instance.reactions = new LinkedList<Reaction>(); // needs manual synchronization
     instance.walletScannerIteration = 1L; // needs manual synchronization (wallet thread and persistence thread)
@@ -91,7 +93,7 @@ public class Post {
     synchronized (this.rewins) {
       rewinsLine += this.rewins
           .stream()
-          .map(p -> ToJSON.toJSON(p.uuid))
+          .map(p -> p.ToJSON())
           .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
     }
     rewinsLine += "]";
@@ -103,6 +105,7 @@ public class Post {
         "\"title\":" + "\"" + this.title + "\"" + ",",
         "\"content\":" + ToJSON.toJSON(this.content) + ",",
         "\"author\":" + "\"" + this.author + "\"" + ",",
+        "\"justDeleted\":" + this.justDeleted + ",",
         "\"walletScannerIteration\":" + "\"" + this.getWalletScannerIteration() + "\"" + ",",
         "\"upvotes\":" + "\"" + this.getUpvotes() + "\"" + ",",
         "\"downvotes\":" + "\"" + this.getDownvotes() + "\"" + ",",

@@ -78,7 +78,7 @@ public class MainServer {
     // RMI configuration
     var remoteServer = RemoteServer.of(winsome);
 
-    var stub = (IRemoteServer) UnicastRemoteObject.exportObject(remoteServer, 0);
+    var stub = (RemoteServer) UnicastRemoteObject.exportObject(remoteServer, 0);
     LocateRegistry.createRegistry(remoteRegistryPort);
     LocateRegistry.getRegistry(remoteRegistryPort).rebind(remoteName, stub);
 
@@ -93,7 +93,6 @@ public class MainServer {
         e.printStackTrace();
       }
 
-      System.out.println(performer + " has " + (hasFollowed ? "followed" : "unfollowed") + " " + receiver);
     });
 
     // multicast configuration

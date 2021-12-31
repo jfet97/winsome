@@ -14,6 +14,4 @@ public interface IRemoteServer extends Remote {
   public void registerFollowersCallback(IRemoteClient remoteClient) throws RemoteException;
 
   public void unregisterFollowersCallback(IRemoteClient remoteClient) throws RemoteException;
-
-  public void notify(String performer, String receiver, Boolean hasFollowed) throws RemoteException;;
 }

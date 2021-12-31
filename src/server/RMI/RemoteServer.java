@@ -2,7 +2,6 @@ package server.RMI;
 
 import java.rmi.RemoteException;
 import java.rmi.server.RemoteObject;
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -38,6 +37,7 @@ public class RemoteServer extends RemoteObject implements IRemoteServer {
     remotes.compute(remoteClient.getUsername(), (k, v) -> null);
   }
 
+  // not available to clients
   public void notify(String performer, String receiver, Boolean hasFollowed) throws RemoteException {
     remotes.computeIfPresent(receiver,
         (__, rc) -> {

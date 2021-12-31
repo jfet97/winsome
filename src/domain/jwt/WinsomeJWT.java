@@ -65,7 +65,7 @@ public class WinsomeJWT {
 
   public static Either<String, String> wrapWithMessageJSON(String jwt, String message) {
     if (jwt == null || message == "") {
-      return Either.left("cannoto wrap jwt because of null arguments");
+      return Either.left("cannot wrap jwt because of null arguments");
     } else {
       return Either.right("{\"jwt\":\"" + jwt + "\",\"message\":\"" + message + "\"}");
     }

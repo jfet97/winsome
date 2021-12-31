@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -75,6 +76,12 @@ public class User {
       } else {
         return ifIsNotFollower.get();
       }
+    }
+  }
+
+  public void iterateSynchronizedOnFollowers(Consumer<String> cb) {
+    synchronized (this.followers) {
+      this.followers.stream().forEach(cb);
     }
   }
 

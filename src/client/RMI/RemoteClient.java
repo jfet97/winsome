@@ -11,6 +11,7 @@ public class RemoteClient extends RemoteObject implements IRemoteClient {
   Set<String> followers = new HashSet<>();
 
   private RemoteClient(String username) {
+    super();
     this.username = username;
   }
 

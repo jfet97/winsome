@@ -17,6 +17,8 @@ public class RemoteServer extends RemoteObject implements IRemoteServer {
   private ConcurrentMap<String, IRemoteClient> remotes = new ConcurrentHashMap<>();
 
   private RemoteServer(Winsome winsome) {
+    super();
+    this.winsome = winsome;
   }
 
   @Override

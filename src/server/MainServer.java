@@ -214,7 +214,7 @@ public class MainServer {
     });
 
     // users
-    configureJExpressUsersHandler(jexpress, objectMapper, winsome);
+    configureJExpressUsersHandlers(jexpress, objectMapper, winsome);
 
     // login, logout
     configureJExpressLoginLogoutHandlers(jexpress, objectMapper, winsome);
@@ -329,7 +329,7 @@ public class MainServer {
 
   }
 
-  private static void configureJExpressUsersHandler(JExpress jexpress, ObjectMapper objectMapper, Winsome winsome) {
+  private static void configureJExpressUsersHandlers(JExpress jexpress, ObjectMapper objectMapper, Winsome winsome) {
 
     // signup
     jexpress.post(USERS_ROUTE, (req, params, reply) -> {
@@ -639,24 +639,37 @@ public class MainServer {
         } else {
 
           var ess = Either.<String, String>right(null);
+          var total = Wrapper.of("");
 
           if (useWincoins) {
-            ess = winsome
+            total.value = winsome
                 .getUserWalletInWincoin(user.username)
-                .map(ws -> ToJSON.toJSON(ws));
-
-            ;
+                .map(ws -> ToJSON.toJSON(ws))
+                .fold(__ -> "", ws -> ws);
           } else if (useBitcoins) {
-            ess = winsome
+            total.value = winsome
                 .getUserWalletInBitcoin(user.username)
-                .map(ws -> ToJSON.toJSON(ws));
-          } else {
-            ess = winsome.getUserWallet(user.username)
-                .map(ws -> ws.stream().map(w -> w.toJSON()).collect(Collectors.toList()))
-                .map(ws -> ToJSON.sequence(ws));
+                .map(bs -> ToJSON.toJSON(bs))
+                .fold(__ -> "", bs -> bs);
           }
 
-          toRet = ess.flatMap(jps -> HttpResponse.build200(Feedback.right(jps).toJSON(),
+          ess = winsome.getUserWallet(user.username)
+              .map(ws -> ws.stream().map(w -> w.toJSON()).collect(Collectors.toList()))
+              .map(ws -> {
+                var toRetI = "{";
+
+                toRetI += "\"history\":" + ToJSON.sequence(ws) + "";
+
+                if (!total.value.equals("")) {
+                  toRetI += ",\"total\":" + total.value + "";
+                }
+
+                toRetI += "}";
+                return toRetI;
+              });
+
+          toRet = ess.flatMap(jps -> HttpResponse.build200(
+              Feedback.right(jps).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON, true))
               .recoverWith(err -> HttpResponse.build400(
                   Feedback.error(ToJSON.toJSON(err)).toJSON(),

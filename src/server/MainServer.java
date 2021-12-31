@@ -53,29 +53,33 @@ public class MainServer {
 
   public static void main(String[] args) throws RemoteException, UnknownHostException, SocketException {
 
-    // configs
-    var tcp_port = 12345;
-    var remote_registry_port = 7777;
-    var udp_port = 33333;
-    var multicast_port = 44444;
-    var multicast_ip = "239.255.32.32";
-    var server_ip = "192.168.1.113";
-    var persistence_path = "/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/server/winsome.json";
-    var author_perc = 70;
-    var persistence_interval = 500L;
-    var wallet_interval = 2000L;
-    var stub_name = "winsome-asc";
+    if (args.length < 1) {
+      System.out.println("Missing server configuration file.\nUse: MainServer path/to/config.json");
+      return;
+    }
 
     // main instances
-    var objectMapper = new ObjectMapper()
-        .enable(SerializationFeature.INDENT_OUTPUT);
+    var objectMapper = new ObjectMapper();
     var jexpress = JExpress.of();
     var winsome = Winsome.of();
+
+    // configs
+    var config = (ServerConfig) null;
+
+    try {
+      config = objectMapper.readValue(new File(args[0]), ServerConfig.class);
+
+      if (!config.isValid()) {
+        throw new RuntimeException("invalid configuration");
+      }
+    } catch (Exception e) {
+      throw new RuntimeException("cannot parse server configuration file: " + e.getMessage());
+    }
 
     // restore the server status from the json file
     try {
       winsome = objectMapper.readValue(
-          new File(persistence_path), Winsome.class);
+          new File(config.persistence_path), Winsome.class);
 
       // if jackson has put null somewhere because of an invalid
       // json file, an exception will be raised
@@ -86,27 +90,29 @@ public class MainServer {
     }
 
     // RMI configuration
-    var psr = configureRMI(winsome, remote_registry_port, stub_name);
+    var psr = configureRMI(winsome, config.remote_registry_port, config.stub_name);
     var stub = psr.snd();
     var remoteServer = psr.fst();
 
     // multicast configuration
-    var pdm = configureMulticast(udp_port, multicast_ip);
+    var pdm = configureMulticast(config.udp_port, config.multicast_ip);
     var ds = pdm.fst();
     var multicastGroup = pdm.snd();
 
     // wallet thread configuration
     var walletThread = new Thread(
-        configureWalletThread(winsome, wallet_interval, author_perc, multicastGroup, multicast_port, ds));
+        configureWalletThread(winsome, config.wallet_interval, config.author_percentage, multicastGroup,
+            config.multicast_port, ds));
 
     // persistence thread configuration
-    var persistenceThread = new Thread(configurePersistenceThread(winsome, persistence_interval, persistence_path));
+    var persistenceThread = new Thread(
+        configurePersistenceThread(winsome, config.persistence_interval, config.persistence_path));
 
     // jexpress framework handlers
-    configureJExpressHandlers(jexpress, objectMapper, winsome, multicast_ip + ":" + multicast_port);
+    configureJExpressHandlers(jexpress, objectMapper, winsome, config.multicast_ip + ":" + config.multicast_port);
 
     // server configuration
-    var server = Server.of(jexpress, server_ip, tcp_port);
+    var server = Server.of(jexpress, config.server_ip, config.tcp_port);
     var serverThread = new Thread(server);
 
     // start threads

@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import domain.comment.Comment;
 import domain.comment.CommentFactory;
+import domain.jwt.WinsomeJWT;
 import domain.post.Post;
 import domain.post.PostFactory;
 import domain.reaction.Reaction;
@@ -43,7 +44,7 @@ public class Winsome {
   @JsonProperty("network")
   private final ConcurrentMap<String, User> network = new ConcurrentHashMap<>();
   @JsonProperty("loggedUsers")
-  private final ConcurrentMap<String, Boolean> loggedUsers = new ConcurrentHashMap<>();
+  private final ConcurrentMap<String, String> loggedUsers = new ConcurrentHashMap<>();
   @JsonProperty("wallet")
   private final Wallet wallet = Wallet.of();
 
@@ -143,28 +144,22 @@ public class Winsome {
 
     return nullGuard(username, "username")
         .flatMap(__ -> nullGuard(password, "password"))
+        .flatMap(__ -> nullGuard(password, "jwt"))
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
         .flatMap(u -> !HashPassword.hash(password).equals(u.password) ? Either.left("invalid password")
             : Either.right(u))
         .flatMap(u -> {
-          // putIfAbsent returns null if there was no previous mapping for the key
-          if (loggedUsers.putIfAbsent(u.username, true) == null) {
 
-            var algorithm = Algorithm.HMAC256(Secrets.JWT_SIGN_SECRET);
+          var newjwt = WinsomeJWT.createJWT(Secrets.JWT_SIGN_SECRET, username);
+          var currJWT = loggedUsers.put(u.username, newjwt);
 
-            var cal = Calendar.getInstance();
-            cal.setTimeInMillis(new Date().getTime());
-            cal.add(Calendar.DATE, 1);
-
-            var jwt = JWT.create()
-                .withExpiresAt(cal.getTime())
-                .withClaim("username", u.username)
-                .sign(algorithm);
-
-            return Either.right(jwt);
+          // put returns null if there was no previous mapping for the key
+          if (currJWT == null) {
+            return WinsomeJWT.wrapWithMessageJSON(newjwt, "user successfully logged");
           } else {
-            return Either.left("user already logged");
+            // always send back the refreshed token
+            return WinsomeJWT.wrapWithMessageJSON(newjwt, "user was already logged");
           }
         });
   }

@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 
 import domain.comment.Comment;
 import domain.feedback.Feedback;
+import domain.jwt.WinsomeJWT;
 import domain.post.Post;
 import domain.reaction.Reaction;
 import domain.user.User;
@@ -142,11 +143,8 @@ public class MainServer {
     ds.close();
   }
 
-  private static void setUpRMI(Winsome winsome) {
-
-  }
-
   private static void addJExpressHandlers(JExpress jexpress, ObjectMapper objectMapper, Winsome winsome) {
+
     // auth middleware
     jexpress.use((req, params, reply, next) -> {
 
@@ -159,40 +157,32 @@ public class MainServer {
       }
 
       var token = req.getHeaders().get("Authorization");
-      var error = false;
+      var errorMessage = "";
 
       try {
-        var verifier = JWT.require(Algorithm.HMAC256(Secrets.JWT_SIGN_SECRET))
-            .withClaimPresence("username")
-            .build(); // Reusable verifier instance
-        var dec = verifier.verify(token.substring(7));
 
-        var usernameClaim = dec.getClaim("username");
+        var valRes = WinsomeJWT.validateJWT(token.substring(7));
 
-        if (usernameClaim.isNull()) {
-          throw new RuntimeException();
+        if (valRes.isRight()) {
+          req.context = valRes.get();
+        } else {
+          errorMessage = valRes.getLeft();
         }
 
-        req.context = User.of(usernameClaim.asString(), "INVALD_USER", null);
-
-        // run the next middleware or the route handler only if the user is authorized
-        next.run();
-
-      } catch (JWTVerificationException e) {
-        // Invalid signature/claims e.g. token expired
-        // reply accordingly
-        error = true;
       } catch (Exception e) {
         // reply accordingly
-        error = true;
+        errorMessage = "cannot authenticate user";
       }
 
-      if (error) {
+      if (!errorMessage.equals("")) {
         var response = HttpResponse.build401(
-            Feedback.error(ToJSON.toJSON("unauthenticated user")).toJSON(),
+            Feedback.error(ToJSON.toJSON(errorMessage)).toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
 
         reply.accept(response);
+      } else {
+        // run the next middleware or the route handler only if the user is authorized
+        next.run();
       }
 
     });
@@ -246,8 +236,8 @@ public class MainServer {
 
         toRet = winsome
             .login(user.username, user.password)
-            .flatMap(jwt -> HttpResponse.build200(
-                Feedback.right(ToJSON.toJSON(jwt)).toJSON(),
+            .flatMap(jwtJSON -> HttpResponse.build200(
+                Feedback.right(jwtJSON).toJSON(),
                 HttpResponse.MIME_APPLICATION_JSON, true))
             .recoverWith(err -> HttpResponse.build400(
                 Feedback.error(ToJSON.toJSON(err)).toJSON(),

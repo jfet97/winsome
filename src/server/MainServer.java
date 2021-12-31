@@ -29,9 +29,11 @@ import http.HttpResponse;
 import io.vavr.control.Either;
 import jexpress.JExpress;
 import secrets.Secrets;
-import server.RMI.IRemoteServer;
 import server.RMI.RemoteServer;
+import server.RMI.IRemoteServer;
+import utils.Pair;
 import utils.ToJSON;
+import utils.Wrapper;
 import winsome.Winsome;
 
 public class MainServer {
@@ -76,19 +78,16 @@ public class MainServer {
     }
 
     // RMI configuration
-    var remoteServer = RemoteServer.of(winsome);
+    var psr = configureRMI(winsome, remoteRegistryPort, remoteName);
+    var stub = psr.snd();
+    var remoteServer = psr.fst();
 
-    var stub = (RemoteServer) UnicastRemoteObject.exportObject(remoteServer, 0);
-    LocateRegistry.createRegistry(remoteRegistryPort);
-    LocateRegistry.getRegistry(remoteRegistryPort).rebind(remoteName, stub);
-
-    winsome.setOnChangeFollowers((performer, receiver,
-        receiverFollowersUpdated, hasFollowed) -> {
+    winsome.setOnChangeFollowers((performer, receiver, hasFollowed) -> {
       // this callback may be called concurrently by multiple threads
       // only do thread safe operations
 
       try {
-        stub.notify(performer, receiver, hasFollowed);
+        remoteServer.notify(performer, receiver, hasFollowed);
       } catch (RemoteException e) {
         e.printStackTrace();
       }
@@ -142,6 +141,33 @@ public class MainServer {
     ds.close();
   }
 
+  private static Pair<RemoteServer, IRemoteServer> configureRMI(Winsome winsome, Integer remoteRegistryPort,
+      String remoteName)
+      throws RemoteException {
+
+    var remoteServerWrapped = Wrapper.<RemoteServer>of(null);
+
+    remoteServerWrapped.value = RemoteServer.of(winsome, username -> {
+
+      // when a new user login, send to him all its current followers
+      // replacing whatever the client had before
+      winsome.synchronizedActionOnFollowersOfUser(username, fs -> {
+        try {
+          remoteServerWrapped.value.replaceAll(username, fs);
+        } catch (RemoteException e) {
+          e.printStackTrace();
+        }
+      });
+
+    });
+
+    var stub = (IRemoteServer) UnicastRemoteObject.exportObject(remoteServerWrapped.value, 0);
+    LocateRegistry.createRegistry(remoteRegistryPort);
+    LocateRegistry.getRegistry(remoteRegistryPort).rebind(remoteName, stub);
+
+    return Pair.of(remoteServerWrapped.value, stub);
+  }
+
   private static void addJExpressHandlers(JExpress jexpress, ObjectMapper objectMapper, Winsome winsome) {
 
     // auth middleware
@@ -160,7 +186,7 @@ public class MainServer {
 
       try {
 
-        var valRes = WinsomeJWT.validateJWT(token.substring(7));
+        var valRes = WinsomeJWT.validateJWT(Secrets.JWT_SIGN_SECRET, token.substring(7));
 
         if (valRes.isRight()) {
           req.context = valRes.get();

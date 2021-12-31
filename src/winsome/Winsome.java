@@ -11,8 +11,10 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -35,7 +37,7 @@ import io.vavr.control.Either;
 import secrets.Secrets;
 import utils.HashPassword;
 import utils.Pair;
-import utils.QuadriConsumer;
+import utils.TriConsumer;
 import utils.Triple;
 import utils.Wrapper;
 
@@ -48,8 +50,7 @@ public class Winsome {
   @JsonProperty("wallet")
   private final Wallet wallet = Wallet.of();
 
-  private QuadriConsumer<String, String, List<String>, Boolean> onChangeFollowers = (performer, receiver,
-      receiverFollowersUpdated, hasFollowed) -> {
+  private TriConsumer<String, String, Boolean> onChangeFollowers = (performer, receiver, hasFollowed) -> {
   };
 
   // ---------------------------------------
@@ -105,7 +106,7 @@ public class Winsome {
   // ---------------------------------------
   // API
 
-  public void setOnChangeFollowers(QuadriConsumer<String, String, List<String>, Boolean> cb) {
+  public void setOnChangeFollowers(TriConsumer<String, String, Boolean> cb) {
     this.onChangeFollowers = cb;
   }
 
@@ -233,7 +234,7 @@ public class Winsome {
             }
           }
           if (b1 && b2) {
-            onChangeFollowers.accept(p.fst().username, p.snd().username, p.snd().getFollowers(), true);
+            onChangeFollowers.accept(p.fst().username, p.snd().username, true);
             return Either.<String, Void>right(null);
           } else {
             return Either.left(username + " was already following " + usernameToFollow);
@@ -263,7 +264,7 @@ public class Winsome {
             }
           }
           if (b1 && b2) {
-            onChangeFollowers.accept(p.fst().username, p.snd().username, p.snd().getFollowers(), false);
+            onChangeFollowers.accept(p.fst().username, p.snd().username, false);
             return Either.<String, Void>right(null);
           } else {
             return Either.left(username + " wasn't following " + usernameToUnfollow);
@@ -527,6 +528,13 @@ public class Winsome {
             }
           }
         });
+  }
+
+  public void synchronizedActionOnFollowersOfUser(String username, Consumer<Set<String>> cb) {
+    this.network.computeIfPresent(username, (__, user) -> {
+      user.synchronizedActionOnFollowers(cb);
+      return user;
+    });
   }
 
   public Either<String, Runnable> makeWalletRunnable(Long interval, Integer authorPercentage) {

@@ -3,8 +3,10 @@ package server.RMI;
 import java.rmi.RemoteException;
 import java.rmi.server.RemoteObject;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Consumer;
 
 import client.RMI.IRemoteClient;
 import domain.user.User;
@@ -14,9 +16,11 @@ import winsome.Winsome;
 public class RemoteServer extends RemoteObject implements IRemoteServer {
 
   Winsome winsome;
+  Consumer<String> onNewClientFollowersRegistration = u -> {
+  };
   private ConcurrentMap<String, IRemoteClient> remotes = new ConcurrentHashMap<>();
 
-  private RemoteServer(Winsome winsome) {
+  private RemoteServer(Winsome winsome, Consumer<String> onNewClientFollowersRegistration) {
     super();
     this.winsome = winsome;
   }
@@ -31,7 +35,10 @@ public class RemoteServer extends RemoteObject implements IRemoteServer {
 
   @Override
   public void registerFollowersCallback(IRemoteClient remoteClient) throws RemoteException {
-    remotes.putIfAbsent(remoteClient.getUsername(), remoteClient);
+    // putIfAbsent returns null if there was no previous mapping for the key
+    if (remotes.putIfAbsent(remoteClient.getUsername(), remoteClient) == null) {
+      onNewClientFollowersRegistration.accept(remoteClient.getUsername());
+    }
   }
 
   @Override
@@ -55,8 +62,21 @@ public class RemoteServer extends RemoteObject implements IRemoteServer {
         });
   }
 
-  public static RemoteServer of(Winsome winsome) {
-    return new RemoteServer(winsome);
+  // not available to clients
+  public void replaceAll(String receiver, Set<String> fs) throws RemoteException {
+    remotes.computeIfPresent(receiver,
+        (__, rc) -> {
+          try {
+            rc.replaceFollowers(fs);
+          } catch (RemoteException e) {
+            e.printStackTrace();
+          }
+          return rc;
+        });
+  }
+
+  public static RemoteServer of(Winsome winsome, Consumer<String> onNewClientFollowersRegistration) {
+    return new RemoteServer(winsome, onNewClientFollowersRegistration);
   }
 
 }

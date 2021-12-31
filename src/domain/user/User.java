@@ -6,7 +6,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import domain.post.Post;
@@ -69,19 +68,9 @@ public class User {
     }
   }
 
-  public <R> R computeIfIsFollowerOf(String username, Supplier<R> ifIsFollower, Supplier<R> ifIsNotFollower) {
-    synchronized (this.following) {
-      if (this.following.contains(username)) {
-        return ifIsFollower.get();
-      } else {
-        return ifIsNotFollower.get();
-      }
-    }
-  }
-
-  public void iterateSynchronizedOnFollowers(Consumer<String> cb) {
+  public void synchronizedActionOnFollowers(Consumer<Set<String>> cb) {
     synchronized (this.followers) {
-      this.followers.stream().forEach(cb);
+      cb.accept(this.followers.stream().collect(Collectors.toSet()));
     }
   }
 

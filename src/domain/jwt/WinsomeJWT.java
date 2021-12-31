@@ -32,11 +32,11 @@ public class WinsomeJWT {
     return jwt;
   }
 
-  public static Either<String, User> validateJWT(String jwt) {
+  public static Either<String, User> validateJWT(String secret, String jwt) {
 
     var toRet = Either.<String, User>right(null);
     try {
-      var verifier = JWT.require(Algorithm.HMAC256(Secrets.JWT_SIGN_SECRET))
+      var verifier = JWT.require(Algorithm.HMAC256(secret))
           .withIssuer("winsome-asc")
           .withClaimPresence("username")
           .build();

@@ -16,6 +16,12 @@ public class RemoteClient extends RemoteObject implements IRemoteClient {
   }
 
   @Override
+  public void replaceFollowers(Set<String> fs) throws RemoteException {
+    if (fs != null)
+      this.followers = fs;
+  }
+
+  @Override
   public void newFollower(String user) throws RemoteException {
     if (user != null)
       this.followers.add(user);

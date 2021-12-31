@@ -9,7 +9,6 @@ import com.auth0.jwt.exceptions.JWTVerificationException;
 
 import domain.user.User;
 import io.vavr.control.Either;
-import secrets.Secrets;
 
 public class WinsomeJWT {
 

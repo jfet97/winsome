@@ -35,7 +35,7 @@ public class WinsomeToJsonTest {
 
     var loggedUsersField = Winsome.class.getDeclaredField("loggedUsers");
     loggedUsersField.setAccessible(true);
-    var loggedUsers = (ConcurrentMap<String, Boolean>) loggedUsersField.get(winsome);
+    var loggedUsers = (ConcurrentMap<String, String>) loggedUsersField.get(winsome);
 
     var walletField = Winsome.class.getDeclaredField("wallet");
     walletField.setAccessible(true);
@@ -54,8 +54,8 @@ public class WinsomeToJsonTest {
     wallet.addTransaction("user1", 4.8).isRight();
     wallet.addTransaction("user2", 9.5).isRight();
 
-    loggedUsers.put("user1", true);
-    loggedUsers.put("user2", true);
+    loggedUsers.put("user1", "123");
+    loggedUsers.put("user2", "456");
 
     var post1User1 = Post.of("Title 1", "Content 1", "user1");
     var post2User1 = Post.of("Title 2", "Content 2", "user1");

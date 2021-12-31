@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.rmi.RemoteException;
@@ -13,12 +12,8 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.stream.Collectors;
 
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.algorithms.Algorithm;
-import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 
 import domain.comment.Comment;
 import domain.feedback.Feedback;
@@ -54,7 +49,7 @@ public class MainServer {
   public static void main(String[] args) throws RemoteException, UnknownHostException, SocketException {
 
     if (args.length < 1) {
-      System.out.println("Missing server configuration file.\nUse: MainServer path/to/config.json");
+      System.out.println("Missing server configuration file.\nUse: java MainServer path/to/config.json");
       return;
     }
 

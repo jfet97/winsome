@@ -24,6 +24,7 @@ public class WinsomeJWT {
     cal.add(Calendar.DATE, 1);
 
     var jwt = JWT.create()
+        .withIssuer("winsome-asc")
         .withExpiresAt(cal.getTime())
         .withClaim("username", username)
         .sign(algorithm);
@@ -36,6 +37,7 @@ public class WinsomeJWT {
     var toRet = Either.<String, User>right(null);
     try {
       var verifier = JWT.require(Algorithm.HMAC256(Secrets.JWT_SIGN_SECRET))
+          .withIssuer("winsome-asc")
           .withClaimPresence("username")
           .build();
 

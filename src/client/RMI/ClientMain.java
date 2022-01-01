@@ -322,7 +322,7 @@ public class ClientMain {
       headers.put("Content-Length", "0");
       headers.put("Authorization", "Bearer " + JWT);
 
-      var erequest = HttpRequest.buildPostRequest("/login", "", headers);
+      var erequest = HttpRequest.buildPostRequest("/logout", "", headers);
 
       var result = erequest.flatMap(r -> doRequest(r, input, output));
 

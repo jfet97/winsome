@@ -20,7 +20,7 @@ public class Post {
   public String content;
   public String author;
   public Boolean justDeleted;
-  public List<AuthorPostUuidPair> rewins; // Pair<author, postUuid>
+  public List<AuthorPostUuid> rewins; // Pair<author, postUuid>
   public List<Comment> comments;
   public List<Reaction> reactions;
   public Long walletScannerIteration;
@@ -35,7 +35,7 @@ public class Post {
     instance.content = content; // readonly
     instance.author = author; // readonly
     instance.justDeleted = false; // needs manual synchronization
-    instance.rewins = new LinkedList<AuthorPostUuidPair>(); // needs manual synchronization
+    instance.rewins = new LinkedList<AuthorPostUuid>(); // needs manual synchronization
     instance.comments = new LinkedList<Comment>(); // needs manual synchronization
     instance.reactions = new LinkedList<Reaction>(); // needs manual synchronization
     instance.walletScannerIteration = 1L; // needs manual synchronization (wallet thread and persistence thread)

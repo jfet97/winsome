@@ -21,6 +21,7 @@ import domain.jwt.WinsomeJWT;
 import domain.post.Post;
 import domain.reaction.Reaction;
 import domain.user.User;
+import domain.user.UserTags;
 import http.HttpResponse;
 import io.vavr.control.Either;
 import jexpress.JExpress;
@@ -413,7 +414,23 @@ public class ServerMain {
 
         toRet = winsome
             .listUsers(user.username)
-            .map(us -> ToJSON.sequence(us.stream().map(ToJSON::toJSON).collect(Collectors.toList())))
+            .flatMap(us -> {
+              // List<String> (usernames) -> List<UserTags>
+              // -> List<String> (UserTags stringified) -> JSON array
+              return Either
+                  .sequence(us
+                      .stream()
+                      .map(u -> winsome
+                          .getUserTags(u)
+                          .map(ts -> UserTags.of(u, ts)))
+                      .collect(Collectors.toList()))
+                  .map(uts -> ToJSON
+                      .sequence(uts
+                          .map(ut -> ut.ToJSON())
+                          .asJava()))
+                  .mapLeft(es -> es
+                      .reduce((a, v) -> a + v));
+            })
             .flatMap(
                 jus -> HttpResponse.build200(Feedback.right(jus).toJSON(),
                     HttpResponse.MIME_APPLICATION_JSON, true))
@@ -449,7 +466,23 @@ public class ServerMain {
         } else {
           toRet = winsome
               .listFollowers(user.username)
-              .map(us -> ToJSON.sequence(us.stream().map(ToJSON::toJSON).collect(Collectors.toList())))
+              .flatMap(us -> {
+                // List<String> (usernames) -> List<UserTags>
+                // -> List<String> (UserTags stringified) -> JSON array
+                return Either
+                    .sequence(us
+                        .stream()
+                        .map(u -> winsome
+                            .getUserTags(u)
+                            .map(ts -> UserTags.of(u, ts)))
+                        .collect(Collectors.toList()))
+                    .map(uts -> ToJSON
+                        .sequence(uts
+                            .map(ut -> ut.ToJSON())
+                            .asJava()))
+                    .mapLeft(es -> es
+                        .reduce((a, v) -> a + v));
+              })
               .flatMap(
                   jus -> HttpResponse.build200(Feedback.right(jus).toJSON(),
                       HttpResponse.MIME_APPLICATION_JSON, true))
@@ -484,7 +517,23 @@ public class ServerMain {
         } else {
           toRet = winsome
               .listFollowing(user.username)
-              .map(us -> ToJSON.sequence(us.stream().map(ToJSON::toJSON).collect(Collectors.toList())))
+              .flatMap(us -> {
+                // List<String> (usernames) -> List<UserTags>
+                // -> List<String> (UserTags stringified) -> JSON array
+                return Either
+                    .sequence(us
+                        .stream()
+                        .map(u -> winsome
+                            .getUserTags(u)
+                            .map(ts -> UserTags.of(u, ts)))
+                        .collect(Collectors.toList()))
+                    .map(uts -> ToJSON
+                        .sequence(uts
+                            .map(ut -> ut.ToJSON())
+                            .asJava()))
+                    .mapLeft(es -> es
+                        .reduce((a, v) -> a + "\n" + v));
+              })
               .flatMap(jus -> HttpResponse.build200(Feedback.right(jus).toJSON(),
                   HttpResponse.MIME_APPLICATION_JSON, true))
               .recoverWith(err -> HttpResponse.build400(

@@ -265,7 +265,8 @@ public class HttpRequest {
   }
 
   // static utilities
-  public static Either<String, HttpRequest> buildPostRequest(String requestTarget, String body, Map<String, String> headers) {
+  public static Either<String, HttpRequest> buildPostRequest(String requestTarget, String body,
+      Map<String, String> headers) {
 
     return HttpRequest.build(HttpRequest.POST)
         .flatMap(r -> r.setHTTPVersion(HTTPV11))
@@ -280,5 +281,21 @@ public class HttpRequest {
           return toRet;
         })
         .flatMap(r -> r.setBody(body));
+  }
+
+  public static Either<String, HttpRequest> buildGetRequest(String requestTarget, Map<String, String> headers) {
+
+    return HttpRequest.build(HttpRequest.GET)
+        .flatMap(r -> r.setHTTPVersion(HTTPV11))
+        .flatMap(r -> r.setRequestTarget(requestTarget))
+        .flatMap(r -> {
+          var toRet = Either.<String, HttpRequest>right(r);
+
+          for (var entry : headers.entrySet()) {
+            toRet = toRet.flatMap(tr -> tr.setHeader(entry.getKey(), entry.getValue()));
+          }
+
+          return toRet;
+        });
   }
 }

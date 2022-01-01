@@ -22,7 +22,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import domain.comment.Comment;
 import domain.comment.CommentFactory;
 import domain.jwt.WinsomeJWT;
-import domain.post.AuthorPostUuidPair;
+import domain.post.AuthorPostUuid;
 import domain.post.Post;
 import domain.post.PostFactory;
 import domain.reaction.Reaction;
@@ -106,6 +106,20 @@ public class Winsome {
 
   public void setOnChangeFollowers(TriConsumer<String, String, Boolean> cb) {
     this.onChangeFollowers = cb;
+  }
+
+  public void synchronizedActionOnFollowersOfUser(String username, Consumer<Set<String>> cb) {
+    this.network.computeIfPresent(username, (__, user) -> {
+      user.synchronizedActionOnFollowers(cb);
+      return user;
+    });
+  }
+
+  public Either<String, List<String>> getUserTags(String username) {
+    return nullGuard(username, "username")
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
+        .map(u -> u.tags.stream().collect(Collectors.toList()));
   }
 
   public Either<String, User> register(String username, String password, List<String> tags) {
@@ -389,7 +403,7 @@ public class Winsome {
               toRet = Either.left("the post has just been deleted");
             } else {
               toRet = makePost(user.username, post.title, post.content);
-              toRet.forEach(p -> post.rewins.add(AuthorPostUuidPair.of(p.author, p.uuid)));
+              toRet.forEach(p -> post.rewins.add(AuthorPostUuid.of(p.author, p.uuid)));
             }
           }
 
@@ -555,13 +569,6 @@ public class Winsome {
             }
           }
         });
-  }
-
-  public void synchronizedActionOnFollowersOfUser(String username, Consumer<Set<String>> cb) {
-    this.network.computeIfPresent(username, (__, user) -> {
-      user.synchronizedActionOnFollowers(cb);
-      return user;
-    });
   }
 
   public Either<String, Runnable> makeWalletRunnable(Long interval, Integer authorPercentage) {

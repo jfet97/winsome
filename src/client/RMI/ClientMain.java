@@ -13,13 +13,15 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.JsonPointer;
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import domain.jwt.WinsomeJWT;
 import domain.user.User;
+import domain.user.UserTags;
 import http.HttpRequest;
 import http.HttpResponse;
 import io.vavr.control.Either;
@@ -32,6 +34,8 @@ public class ClientMain {
 
   // auth token
   private static String JWT = "";
+  // current username
+  private static String username = "";
 
   public static void main(String[] args) {
 
@@ -39,7 +43,7 @@ public class ClientMain {
     var server_ip = "192.168.1.113";
     var auth_token_path = "/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/client/RMI/token.txt";
 
-    printClient("welcome to Winsome CLI!");
+    System.out.println("welcome to Winsome CLI!");
 
     var path = Paths.get(auth_token_path);
     try {
@@ -49,13 +53,14 @@ public class ClientMain {
 
       var eusername = WinsomeJWT.extractUsernameFromJWT(jwt);
       if (eusername.isLeft()) {
-        printClient(eusername.getLeft() + ", please login again");
+        System.out.println(eusername.getLeft() + ", please login again");
       } else {
-        printClient("logged as " + eusername.get());
+        username = eusername.get();
+        System.out.println("logged as " + username);
       }
 
     } catch (IOException ex) {
-      printClient("no auth token found, please login again");
+      System.out.println("no auth token found, please login again");
     }
 
     // jackson main instance
@@ -69,6 +74,7 @@ public class ClientMain {
       startCLI(inputStream, outputStream, jwt -> {
         // on refreshed jwt
         JWT = jwt;
+        username = WinsomeJWT.extractUsernameFromJWT(jwt).get();
 
         try {
           Files.write(path, jwt.getBytes());
@@ -78,6 +84,7 @@ public class ClientMain {
       }, () -> {
         // on logout
         JWT = "";
+        username = "";
 
         try {
           Files.deleteIfExists(path);
@@ -112,7 +119,7 @@ public class ClientMain {
             //
             // register a new user to winsome
 
-            printServer(
+            System.out.println(
                 handleRegisterCommand(tokens, input, output)
                     .fold(s -> s, s -> s));
             break;
@@ -125,11 +132,11 @@ public class ClientMain {
             var eres = handleLoginCommand(tokens, input, output);
 
             if (eres.isLeft()) {
-              printServer(eres.getLeft());
+              System.out.println(eres.getLeft());
             } else {
               var pair = eres.get();
               onRefreshedJWT.accept(pair.fst());
-              printServer(pair.snd());
+              System.out.println(pair.snd());
             }
 
             break;
@@ -139,13 +146,14 @@ public class ClientMain {
             //
             // logout an user
 
-            var eres = handleLogoutCommand(tokens, input, output);
+            var eres = checkUserIsLogged()
+                .flatMap(__ -> handleLogoutCommand(tokens, input, output));
 
             if (eres.isLeft()) {
-              printServer(eres.getLeft());
+              System.out.println(eres.getLeft());
             } else {
               onLogout.run();
-              printServer(eres.get());
+              System.out.println(eres.get());
             }
             break;
           }
@@ -155,6 +163,23 @@ public class ClientMain {
             // list users having at least one common tag
             // list my followers
             // list users I follow
+
+            var eres = checkUserIsLogged()
+                .flatMap(__ -> handleListCommand(tokens, input, output));
+
+            if (eres.isLeft()) {
+              System.out.println(eres.getLeft());
+            } else {
+              var userTags = eres.get();
+
+              // print users
+              String leftAlignFormat = "| %-15s | %-30s |%n";
+              System.out.format("| Username        | Tags %n");
+              userTags
+                  .stream()
+                  .forEach(ut -> System.out.format(leftAlignFormat, ut.username,
+                      ut.tags.stream().reduce("", (a, v) -> a.equals("") ? v : a + ", " + v)));
+            }
             break;
           }
           case "follow": {
@@ -219,7 +244,7 @@ public class ClientMain {
             break;
           }
           default: {
-            printClient(op.equals("") ? "Empty command" : "Unknown command " + op);
+            System.out.println(op.equals("") ? "Empty command" : "Unknown command " + op);
             break;
           }
         }
@@ -227,7 +252,7 @@ public class ClientMain {
       }
     } catch (Exception e) {
       e.printStackTrace();
-      printClient("An error has occurred: " + e.getMessage());
+      System.out.println("An error has occurred: " + e.getMessage());
     }
   }
 
@@ -259,7 +284,7 @@ public class ClientMain {
           var pointer = JsonPointer.compile("/res");
 
           return Either.right(node.at(pointer).asText());
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
           e.printStackTrace();
           return Either.left(e.getMessage());
         }
@@ -302,7 +327,7 @@ public class ClientMain {
               node.at(pointerMessage).asText());
 
           return Either.right(toRet);
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
           e.printStackTrace();
           return Either.left(e.getMessage());
         }
@@ -336,7 +361,65 @@ public class ClientMain {
           var pointer = JsonPointer.compile("/res");
 
           return Either.right(node.at(pointer).asText());
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
+          e.printStackTrace();
+          return Either.left(e.getMessage());
+        }
+      });
+
+    }
+  }
+
+  private static Either<String, List<UserTags>> handleListCommand(List<String> tokens, BufferedReader input,
+      PrintWriter output) {
+
+    if (tokens.size() != 2) {
+      return Either.left("Invalid use of command list.\nUse: list users || list followers || list following");
+    } else {
+
+      var endpoint = tokens.get(1);
+      var isValidEndpoint = endpoint.equals("users") || endpoint.equals("followers") || endpoint.equals("following");
+
+      if (!isValidEndpoint) {
+        return Either.left("Invalid use of command list.\nUse: list users || list followers || list following");
+      }
+
+      var target = "/";
+      if (endpoint.equals("followers") || endpoint.equals("following")) {
+        target += "users/" + username + "/" + endpoint;
+      } else {
+        target += endpoint;
+      }
+
+      var headers = new HashMap<String, String>();
+      headers.put("Content-Length", "0");
+      headers.put("Authorization", "Bearer " + JWT);
+
+      var erequest = HttpRequest.buildGetRequest(target, headers);
+
+      var result = erequest.flatMap(r -> doRequest(r, input, output));
+
+      return result.flatMap(res -> {
+        // extract data from JSON
+        var body = res.getBody();
+
+        try {
+          var node = objectMapper.readTree(body);
+          var pointerRes = JsonPointer.compile("/res");
+          var pointerOk = JsonPointer.compile("/ok");
+
+          var isOk = node.at(pointerOk).asBoolean();
+          if (isOk) {
+            // res is expected to be an array of UserTags
+            return Either.right(
+                objectMapper
+                    .convertValue(node.at(pointerRes), new TypeReference<List<UserTags>>() {
+                    }));
+          } else {
+            return Either.left(node.at(pointerRes).asText());
+          }
+
+        } catch (Exception e) {
           e.printStackTrace();
           return Either.left(e.getMessage());
         }
@@ -409,11 +492,19 @@ public class ClientMain {
 
   }
 
-  private static void printClient(String str) {
+  private static void serverStr(String str) {
     System.out.println("Client: " + str);
   }
 
-  private static void printServer(String str) {
+  private static void clientStr(String str) {
     System.out.println("Server: " + str);
+  }
+
+  private static Either<String, Void> checkUserIsLogged() {
+    if (username.equals("")) {
+      return Either.left("user is not logged");
+    } else {
+      return Either.right(null);
+    }
   }
 }

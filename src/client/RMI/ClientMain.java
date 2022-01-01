@@ -67,8 +67,20 @@ public class ClientMain {
       var outputStream = new PrintWriter(socket.getOutputStream(), true);
 
       startCLI(inputStream, outputStream, jwt -> {
+        // on refreshed jwt
+        JWT = jwt;
+
         try {
           Files.write(path, jwt.getBytes());
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+      }, () -> {
+        // on logout
+        JWT = "";
+
+        try {
+          Files.deleteIfExists(path);
         } catch (IOException e) {
           e.printStackTrace();
         }
@@ -80,7 +92,8 @@ public class ClientMain {
 
   }
 
-  public static void startCLI(BufferedReader input, PrintWriter output, Consumer<String> onRefreshedJWT) {
+  public static void startCLI(BufferedReader input, PrintWriter output, Consumer<String> onRefreshedJWT,
+      Runnable onLogout) {
     try (var scanner = new Scanner(System.in);) {
 
       while (true) {
@@ -115,8 +128,7 @@ public class ClientMain {
               printServer(eres.getLeft());
             } else {
               var pair = eres.get();
-              JWT = pair.fst();
-              onRefreshedJWT.accept(JWT);
+              onRefreshedJWT.accept(pair.fst());
               printServer(pair.snd());
             }
 
@@ -126,6 +138,15 @@ public class ClientMain {
             // logout
             //
             // logout an user
+
+            var eres = handleLogoutCommand(tokens, input, output);
+
+            if (eres.isLeft()) {
+              printServer(eres.getLeft());
+            } else {
+              onLogout.run();
+              printServer(eres.get());
+            }
             break;
           }
           case "list": {
@@ -205,8 +226,8 @@ public class ClientMain {
 
       }
     } catch (Exception e) {
-      printClient("An error has occurred: " + e.getMessage());
       e.printStackTrace();
+      printClient("An error has occurred: " + e.getMessage());
     }
   }
 
@@ -239,6 +260,7 @@ public class ClientMain {
 
           return Either.right(node.at(pointer).asText());
         } catch (JsonProcessingException e) {
+          e.printStackTrace();
           return Either.left(e.getMessage());
         }
 
@@ -268,7 +290,7 @@ public class ClientMain {
       return result.flatMap(res -> {
         var body = res.getBody();
 
-        // extract 'res' from JSON
+        // extract 'jwt' and 'message' from JSON
         try {
           var node = objectMapper.readTree(body);
 
@@ -281,12 +303,46 @@ public class ClientMain {
 
           return Either.right(toRet);
         } catch (JsonProcessingException e) {
+          e.printStackTrace();
           return Either.left(e.getMessage());
         }
 
       });
     }
 
+  }
+
+  private static Either<String, String> handleLogoutCommand(List<String> tokens, BufferedReader input,
+      PrintWriter output) {
+    if (tokens.size() != 1) {
+      return Either.left("Invalid use of command logout.\nUse: logout");
+    } else {
+
+      var headers = new HashMap<String, String>();
+      headers.put("Content-Length", "0");
+      headers.put("Authorization", "Bearer " + JWT);
+
+      var erequest = HttpRequest.buildPostRequest("/login", "", headers);
+
+      var result = erequest.flatMap(r -> doRequest(r, input, output));
+
+      return result.flatMap(res -> {
+        // extract 'res' from JSON
+        var body = res.getBody();
+
+        try {
+          var node = objectMapper.readTree(body);
+
+          var pointer = JsonPointer.compile("/res");
+
+          return Either.right(node.at(pointer).asText());
+        } catch (JsonProcessingException e) {
+          e.printStackTrace();
+          return Either.left(e.getMessage());
+        }
+      });
+
+    }
   }
 
   // do an HttpRequest, return a parsed HttpResponse

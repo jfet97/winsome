@@ -90,6 +90,7 @@ public class HttpResponse {
         }
 
       } catch (Exception e) {
+        e.printStackTrace();
         errorMessage = "invalid or not supported HTTP response:\n" + e.getMessage();
       }
     }

@@ -113,9 +113,11 @@ public class JExpress {
         resWrapper.value = response;
       }, () -> runMiddlewares(request, parametersFromPath, middlewares, index + 1, runRouteHandler, resWrapper));
 
-    } catch (Exception e) {
+    } catch (IndexOutOfBoundsException e) {
       // expect an IOOB exception when we run out of middlewares
       runRouteHandler.value = true;
+    } catch(Exception e) {
+      e.printStackTrace();
     }
 
   }

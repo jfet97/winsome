@@ -23,6 +23,7 @@ public class HashPassword {
       return sb.toString();
 
     } catch (NoSuchAlgorithmException e) {
+      e.printStackTrace();
       // impossible, but...
       throw new RuntimeException(e.getMessage());
     }

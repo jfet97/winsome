@@ -111,9 +111,11 @@ public class HttpRequest {
 
                 instance.queryParams.put(key, value);
               } catch (Exception e) {
+                e.printStackTrace();
               }
             });
           } catch (Exception e) {
+            e.printStackTrace();
           }
         }
 

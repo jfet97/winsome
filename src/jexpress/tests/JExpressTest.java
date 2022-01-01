@@ -196,6 +196,7 @@ public class JExpressTest {
         error = true;
       } catch (Exception e) {
         // reply accordingly
+        e.printStackTrace();
         error = true;
       }
 

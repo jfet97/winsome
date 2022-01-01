@@ -518,7 +518,7 @@ public class Winsome {
             }
 
           } catch (Exception e) {
-            System.out.println(e.getMessage());
+            e.printStackTrace();
             return Either.left("conversion in bitcoin has failed");
           }
 

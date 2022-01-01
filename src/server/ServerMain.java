@@ -324,11 +324,13 @@ public class ServerMain {
                 true));
 
       } catch (JsonProcessingException e) {
+        e.printStackTrace();
         toRet = HttpResponse.build400(
             Feedback.error(
                 ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 
@@ -355,6 +357,7 @@ public class ServerMain {
                 true));
 
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 
@@ -387,11 +390,13 @@ public class ServerMain {
                 true));
 
       } catch (JsonProcessingException e) {
+        e.printStackTrace();
         toRet = HttpResponse.build400(
             Feedback.error(
                 ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 
@@ -418,6 +423,7 @@ public class ServerMain {
                 true));
 
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 
@@ -454,6 +460,7 @@ public class ServerMain {
         }
 
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 
@@ -487,6 +494,7 @@ public class ServerMain {
         }
 
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 
@@ -525,11 +533,13 @@ public class ServerMain {
         }
 
       } catch (JsonProcessingException e) {
+        e.printStackTrace();
         toRet = HttpResponse.build400(
             Feedback.error(
                 ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 
@@ -568,11 +578,13 @@ public class ServerMain {
         }
 
       } catch (JsonProcessingException e) {
+        e.printStackTrace();
         toRet = HttpResponse.build400(
             Feedback.error(
                 ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 
@@ -610,6 +622,7 @@ public class ServerMain {
         }
 
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 
@@ -647,6 +660,7 @@ public class ServerMain {
         }
 
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 
@@ -712,6 +726,7 @@ public class ServerMain {
         }
 
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 
@@ -753,11 +768,13 @@ public class ServerMain {
         }
 
       } catch (JsonProcessingException e) {
+        e.printStackTrace();
         toRet = HttpResponse.build400(
             Feedback.error(
                 ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 
@@ -792,6 +809,7 @@ public class ServerMain {
         }
 
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 
@@ -818,6 +836,7 @@ public class ServerMain {
                 true));
 
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 
@@ -852,6 +871,7 @@ public class ServerMain {
         }
 
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 
@@ -887,11 +907,13 @@ public class ServerMain {
         }
 
       } catch (JsonProcessingException e) {
+        e.printStackTrace();
         toRet = HttpResponse.build400(
             Feedback.error(
                 ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 
@@ -927,11 +949,13 @@ public class ServerMain {
         }
 
       } catch (JsonProcessingException e) {
+        e.printStackTrace();
         toRet = HttpResponse.build400(
             Feedback.error(
                 ToJSON.toJSON("invalid body: " + e.getMessage())).toJSON(),
             HttpResponse.MIME_APPLICATION_JSON, true);
       } catch (Exception e) {
+        e.printStackTrace();
         toRet = Either.left(e.getMessage());
       }
 

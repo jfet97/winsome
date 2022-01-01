@@ -32,7 +32,7 @@ import utils.ToJSON;
 import utils.Wrapper;
 import winsome.Winsome;
 
-public class MainServer {
+public class ServerMain {
 
   private static String USERS_ROUTE = "/users";
   private static String FOLLOWERS_ROUTE = "/followers";

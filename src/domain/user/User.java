@@ -19,17 +19,21 @@ public class User {
   public Set<String> followers;
   public Set<String> following;
 
-  public static User of(String username, String password, List<String> tags) {
+  public static User of(String username, String password, List<String> tags, Boolean hashPassword) {
     var instance = new User();
 
     instance.username = username; // readonly
-    instance.password = HashPassword.hash(password); // readonly
+    instance.password = hashPassword ? HashPassword.hash(password) : password; // readonly
     instance.tags = tags; // readonly
     instance.posts = new ConcurrentHashMap<String, Post>();
     instance.followers = new HashSet<String>(); // needs manual synchronization
     instance.following = new HashSet<String>(); // needs manual synchronization
 
     return instance;
+  }
+
+  public static User of(String username, String password, List<String> tags) {
+    return of(username, password, tags, true);
   }
 
   public List<String> getFollowers() {

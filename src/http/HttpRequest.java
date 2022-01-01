@@ -5,7 +5,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+import io.vavr.Function2;
 import io.vavr.control.Either;
 
 public class HttpRequest {
@@ -24,6 +26,13 @@ public class HttpRequest {
   public static final String HTTPV11 = "HTTP/1.1";
   public static final String HTTPV20 = "HTTP/2.0";
   public static final String CRLF = "\r\n";
+
+  public static final String GET = "GET";
+  public static final String POST = "POST";
+  public static final String PUT = "PUT";
+  public static final String PATCH = "PATCH";
+  public static final String DELETE = "DELETE";
+  public static final String OPTIONS = "OPTIONS";
 
   public static Either<String, HttpRequest> build(String method) {
     HttpRequest instance = new HttpRequest();
@@ -251,5 +260,23 @@ public class HttpRequest {
 
   public String getBody() {
     return this.body;
+  }
+
+  // static utilities
+  public static Either<String, HttpRequest> buildPostRequest(String requestTarget, String body, Map<String, String> headers) {
+
+    return HttpRequest.build(HttpRequest.POST)
+        .flatMap(r -> r.setHTTPVersion(HTTPV11))
+        .flatMap(r -> r.setRequestTarget(requestTarget))
+        .flatMap(r -> {
+          var toRet = Either.<String, HttpRequest>right(r);
+
+          for (var entry : headers.entrySet()) {
+            toRet = toRet.flatMap(tr -> tr.setHeader(entry.getKey(), entry.getValue()));
+          }
+
+          return toRet;
+        })
+        .flatMap(r -> r.setBody(body));
   }
 }

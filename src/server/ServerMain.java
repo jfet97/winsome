@@ -208,7 +208,7 @@ public class ServerMain {
       String multicastIpPort) {
 
     // auth middleware
-    configureJExpressAuthMiddleware(jexpress);
+    configureJExpressAuthMiddleware(jexpress, winsome);
 
     // CORS middleware
     configureJExpressCORSMiddleware(jexpress);
@@ -235,7 +235,7 @@ public class ServerMain {
 
   }
 
-  private static void configureJExpressAuthMiddleware(JExpress jexpress) {
+  private static void configureJExpressAuthMiddleware(JExpress jexpress, Winsome winsome) {
     jexpress.use((req, params, reply, next) -> {
 
       var target = req.getRequestTarget();
@@ -254,13 +254,18 @@ public class ServerMain {
       var errorMessage = "";
 
       try {
+        var jwt = token.substring(7);
 
-        var valRes = WinsomeJWT.validateJWT(Secrets.JWT_SIGN_SECRET, token.substring(7));
+        var euser = WinsomeJWT
+            .validateJWT(Secrets.JWT_SIGN_SECRET, jwt)
+            .flatMap(u -> winsome
+                .getUserJWT(u.username)
+                .flatMap(currJWT -> currJWT.equals(jwt) ? Either.right(u) : Either.left("invalid auth token")));
 
-        if (valRes.isRight()) {
-          req.context = valRes.get();
+        if (euser.isRight()) {
+          req.context = euser.get();
         } else {
-          errorMessage = valRes.getLeft();
+          errorMessage = euser.getLeft();
         }
 
       } catch (Exception e) {
@@ -320,7 +325,7 @@ public class ServerMain {
                 Feedback.right(jwtJSON).toJSON(),
                 HttpResponse.MIME_APPLICATION_JSON, true))
             .recoverWith(err -> HttpResponse.build400(
-                Feedback.error(err.contains("jwt") && err.contains("message") ? err : ToJSON.toJSON(err)).toJSON(),
+                Feedback.error(err.contains("jwt") && err.contains("message") ? err : err).toJSON(),
                 HttpResponse.MIME_APPLICATION_JSON,
                 true));
 

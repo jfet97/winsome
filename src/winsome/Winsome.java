@@ -122,6 +122,19 @@ public class Winsome {
         .map(u -> u.tags.stream().collect(Collectors.toList()));
   }
 
+  public Either<String, String> getUserJWT(String username) {
+    return nullGuard(username, "username")
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
+        .flatMap(u -> {
+          var jwt = loggedUsers.get(u.username);
+          if (jwt == null)
+            return Either.left("user is not logged");
+          else
+            return Either.right(jwt);
+        });
+  }
+
   public Either<String, User> register(String username, String password, List<String> tags) {
 
     // we have to avoid data race condition:
@@ -172,7 +185,7 @@ public class Winsome {
             return WinsomeJWT.wrapWithMessageJSON(newjwt, "user successfully logged");
           } else {
             // always send back the refreshed token, but creates an error
-            return WinsomeJWT.wrapWithMessageJSON(newjwt, "user was already logged")
+            return WinsomeJWT.wrapWithMessageJSON(newjwt, "user was already logged, previous sessions are now invalid")
                 .flatMap(json -> Either.left(json));
           }
         });

@@ -13,7 +13,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.JsonPointer;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -36,6 +35,11 @@ public class ClientMain {
   private static String JWT = "";
   // current username
   private static String username = "";
+  // utils
+  private static Consumer<String> onRefreshedJWT = jtw -> {
+  };
+  private static Runnable onLogout = () -> {
+  };
 
   public static void main(String[] args) {
 
@@ -71,17 +75,27 @@ public class ClientMain {
       var inputStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
       var outputStream = new PrintWriter(socket.getOutputStream(), true);
 
-      startCLI(inputStream, outputStream, jwt -> {
+      onRefreshedJWT = jwt -> {
         // on refreshed jwt
+
         JWT = jwt;
-        username = WinsomeJWT.extractUsernameFromJWT(jwt).get();
+        var eusername = WinsomeJWT.extractUsernameFromJWT(jwt);
+        if (eusername.isLeft()) {
+          System.out.println("something went wrong during token refreshing");
+          onLogout.run();
+          return;
+        } else {
+          username = eusername.get();
+        }
 
         try {
           Files.write(path, jwt.getBytes());
         } catch (IOException e) {
           e.printStackTrace();
         }
-      }, () -> {
+      };
+
+      onLogout = () -> {
         // on logout
         JWT = "";
         username = "";
@@ -91,7 +105,9 @@ public class ClientMain {
         } catch (IOException e) {
           e.printStackTrace();
         }
-      });
+      };
+
+      startCLI(inputStream, outputStream);
 
     } catch (IOException e) {
       e.printStackTrace();
@@ -99,8 +115,7 @@ public class ClientMain {
 
   }
 
-  public static void startCLI(BufferedReader input, PrintWriter output, Consumer<String> onRefreshedJWT,
-      Runnable onLogout) {
+  public static void startCLI(BufferedReader input, PrintWriter output) {
     try (var scanner = new Scanner(System.in);) {
 
       while (true) {
@@ -173,12 +188,13 @@ public class ClientMain {
               var userTags = eres.get();
 
               // print users
-              String leftAlignFormat = "| %-15s | %-30s |%n";
+              String leftAlignFormat = "| %-15s | %-30s %n";
               System.out.format("| Username        | Tags %n");
               userTags
                   .stream()
                   .forEach(ut -> System.out.format(leftAlignFormat, ut.username,
                       ut.tags.stream().reduce("", (a, v) -> a.equals("") ? v : a + ", " + v)));
+              System.out.println("");
             }
             break;
           }
@@ -297,7 +313,9 @@ public class ClientMain {
   private static Either<String, Pair<String, String>> handleLoginCommand(List<String> tokens, BufferedReader input,
       PrintWriter output) {
 
-    if (tokens.size() != 3) {
+    if (!username.equals("")) {
+      return Either.left("already logged as " + username);
+    } else if (tokens.size() != 3) {
       return Either.left("Invalid use of command login.\nUse: login <username> <password>");
     } else {
       var usernamePassword = User.of(tokens.get(1), tokens.get(2), new LinkedList<>(), false);
@@ -319,14 +337,21 @@ public class ClientMain {
         try {
           var node = objectMapper.readTree(body);
 
-          var pointerJWT = JsonPointer.compile("/res/jwt");
-          var pointerMessage = JsonPointer.compile("/res/message");
+          var pointer = JsonPointer.compile("/res");
+          if (node.at(pointer).isObject()) {
+            var pointerJWT = JsonPointer.compile("/res/jwt");
+            var pointerMessage = JsonPointer.compile("/res/message");
 
-          var toRet = Pair.of(
-              node.at(pointerJWT).asText(),
-              node.at(pointerMessage).asText());
+            var toRet = Pair.of(
+                node.at(pointerJWT).asText(),
+                node.at(pointerMessage).asText());
 
-          return Either.right(toRet);
+            return Either.right(toRet);
+          } else {
+            // res should be a message containing an error
+            return Either.left(node.at(pointer).asText());
+          }
+
         } catch (Exception e) {
           e.printStackTrace();
           return Either.left(e.getMessage());
@@ -488,7 +513,16 @@ public class ClientMain {
       return Either.left(e.getMessage());
     }
 
-    return HttpResponse.parse(res.toString());
+    var resp = HttpResponse.parse(res.toString());
+
+    resp.forEach(r -> {
+      if (r.getStatusCode().equals("401")) {
+        System.out.println("you have been logged out because of an unauthorized request");
+        onLogout.run();
+      }
+    });
+
+    return resp;
 
   }
 

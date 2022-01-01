@@ -23,6 +23,7 @@ public class JExpress {
   private final String PUT = "PUT";
   private final String PATCH = "PATCH";
   private final String DELETE = "DELETE";
+  private final String OPTIONS = "OPTIONS";
 
   private final Map<String, Map<ExpressRoute, TriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>>>> routes = new HashMap<>();
   private final List<QuadriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>, Runnable>> globalMiddlewares = new LinkedList<>();
@@ -33,6 +34,7 @@ public class JExpress {
     this.routes.put(PUT, new HashMap<>());
     this.routes.put(PATCH, new HashMap<>());
     this.routes.put(DELETE, new HashMap<>());
+    this.routes.put(OPTIONS, new HashMap<>());
   }
 
   public static JExpress of() {
@@ -82,6 +84,12 @@ public class JExpress {
       TriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>> cb) {
     var jexpressRoute = new ExpressRoute(route);
     this.add(jexpressRoute, DELETE, cb);
+  }
+
+  public void options(String route,
+      TriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>> cb) {
+    var jexpressRoute = new ExpressRoute(route);
+    this.add(jexpressRoute, OPTIONS, cb);
   }
 
   // -------------------------------------------------

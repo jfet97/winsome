@@ -110,7 +110,7 @@ public class Server implements Runnable {
         var req = ereq.get();
 
         var method = req.getMethod();
-        var isGetOrDelete = method.equals("GET") || method.equals("DELETE");
+        var noCLRequired = method.equals("GET") || method.equals("DELETE") || method.equals("OPTIONS");
         var contentLengthHeader = req.getHeaders().get("Content-Length");
         var isThereContentLengthHeader = contentLengthHeader != null;
 
@@ -144,7 +144,7 @@ public class Server implements Runnable {
             error = "malformed Content-Length header";
           }
 
-        } else if (!isGetOrDelete) {
+        } else if (!noCLRequired) {
           // if there is no Content-Length header and the request is not a GET request nor
           // a DELETE request the server does not accept that request
           error = "missing Content-Length header";

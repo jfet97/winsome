@@ -24,6 +24,7 @@ public class HttpResponse {
 
   public static final String[] OK_200 = { "200", "OK" };
   public static final String[] CREATED_201 = { "201", "Created" };
+  public static final String[] CREATED_204 = { "204", "No Content" };
   public static final String[] BAD_REQUEST_400 = { "400", "Bad Request" };
   public static final String[] UNAUTHORIZED_401 = { "401", "Unauthorized" };
   public static final String[] FORBIDDEN_403 = { "403", "Forbidden" };
@@ -189,15 +190,23 @@ public class HttpResponse {
   }
 
   public static Either<String, HttpResponse> build200(String bodyN, String mime, Boolean keepAliveConnection) {
-    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.OK_200);
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.OK_200)
+        .flatMap(r -> r.setHeader("Access-Control-Allow-Origin", "*")); // temp bugfix because of cors
   }
 
   public static Either<String, HttpResponse> build201(String bodyN, String mime, Boolean keepAliveConnection) {
-    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.CREATED_201);
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.CREATED_201)
+        .flatMap(r -> r.setHeader("Access-Control-Allow-Origin", "*")); // temp bugfix because of cors
+  }
+
+  public static Either<String, HttpResponse> build204(String bodyN, String mime, Boolean keepAliveConnection) {
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.CREATED_204)
+        .flatMap(r -> r.setHeader("Access-Control-Allow-Origin", "*")); // temp bugfix because of cors
   }
 
   public static Either<String, HttpResponse> build400(String bodyN, String mime, Boolean keepAliveConnection) {
-    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.BAD_REQUEST_400);
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.BAD_REQUEST_400)
+        .flatMap(r -> r.setHeader("Access-Control-Allow-Origin", "*")); // temp bugfix because of cors
   }
 
   public static Either<String, HttpResponse> build401(String bodyN, String mime, Boolean keepAliveConnection) {

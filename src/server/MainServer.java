@@ -209,6 +209,9 @@ public class MainServer {
     // auth middleware
     configureJExpressAuthMiddleware(jexpress);
 
+    // CORS middleware
+    configureJExpressCORSMiddleware(jexpress);
+
     // multicast info
     jexpress.get("/multicast", (req, params, reply) -> {
       reply.accept(
@@ -236,10 +239,14 @@ public class MainServer {
 
       var target = req.getRequestTarget();
       var method = req.getMethod();
-      if (target.equals(LOGIN_ROUTE) || (target.equals(USERS_ROUTE) && method.equals("POST"))) {
+      if (method.equals("OPTIONS") ||
+          target.equals(LOGIN_ROUTE) ||
+          (target.equals(USERS_ROUTE) && method.equals("POST"))) {
         // auth not needed when a user tries to login
         // auth not needed when a someone tries to sign up
+        // auth not needed for preflight requests
         next.run();
+        return;
       }
 
       var token = req.getHeaders().get("Authorization");
@@ -273,6 +280,26 @@ public class MainServer {
 
     });
 
+  }
+
+  private static void configureJExpressCORSMiddleware(JExpress jexpress) {
+    jexpress.options("/*", (req, params, reply) -> {
+      reply.accept(HttpResponse.build500("", HttpResponse.MIME_TEXT_PLAIN, false));
+    });
+
+    jexpress.use((req, params, reply, next) -> {
+
+      if (req.getMethod().equals("OPTIONS")) {
+        reply.accept(HttpResponse.build200("", HttpResponse.MIME_TEXT_PLAIN, true)
+            .flatMap(r -> r.setHeader("Access-Control-Allow-Origin", "*"))
+            .flatMap(r -> r.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, PATCH, DELETE"))
+            .flatMap(r -> r.setHeader("Access-Control-Allow-Headers", "*"))
+            .flatMap(r -> r.setHeader("Access-Control-Allow-Credentials", "true")));
+      } else {
+        next.run();
+      }
+
+    });
   }
 
   private static void configureJExpressLoginLogoutHandlers(JExpress jexpress, ObjectMapper objectMapper,

@@ -37,7 +37,8 @@ public class HttpRequest {
         case "POST":
         case "PUT":
         case "PATCH":
-        case "DELETE": {
+        case "DELETE":
+        case "OPTIONS": {
           instance.method = method;
           break;
         }
@@ -78,7 +79,8 @@ public class HttpRequest {
           case "POST":
           case "PUT":
           case "PATCH":
-          case "DELETE": {
+          case "DELETE":
+          case "OPTIONS": {
             break;
           }
           default: {
@@ -192,7 +194,8 @@ public class HttpRequest {
     // to reject the request — while not prohibited by the specification, the
     // semantics are undefined. It is better to just avoid sending payloads in GET
     // requests.
-    if ((this.method.equals("GET") || this.method.equals("DELETE")) && !this.body.equals("")) {
+    if ((this.method.equals("GET") || this.method.equals("DELETE") || method.equals("OPTIONS"))
+        && !this.body.equals("")) {
       isValid = false;
     }
 

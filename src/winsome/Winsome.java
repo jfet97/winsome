@@ -255,7 +255,7 @@ public class Winsome {
 
     return nullGuard(username, "username")
         .flatMap(__ -> nullGuard(usernameToFollow, "usernameToFollow"))
-        .flatMap(__ -> username == usernameToFollow ? Either.left("an user cannot follow itself") : Either.right(null))
+        .flatMap(__ -> username.equals(usernameToFollow) ? Either.left("an user cannot follow itself") : Either.right(null))
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .flatMap(u -> u == null ? Either.left("unknown user " + username)
             : Either.<String, User>right(network.get(usernameToFollow))

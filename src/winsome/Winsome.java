@@ -166,7 +166,7 @@ public class Winsome {
         });
   }
 
-  public Either<String, String> login(String username, String password) {
+  public Either<String, String> login(String username, String password, Boolean forceLogin) {
 
     return nullGuard(username, "username")
         .flatMap(__ -> nullGuard(password, "password"))
@@ -178,15 +178,18 @@ public class Winsome {
         .flatMap(u -> {
 
           var newjwt = WinsomeJWT.createJWT(Secrets.JWT_SIGN_SECRET, username);
-          var currJWT = loggedUsers.put(u.username, newjwt);
+          var currJWT = loggedUsers.putIfAbsent(u.username, newjwt);
 
-          // put returns null if there was no previous mapping for the key
+          // putIfAbsent returns null if there was no previous mapping for the key
           if (currJWT == null) {
             return WinsomeJWT.wrapWithMessageJSON(newjwt, "user successfully logged");
+          } else if (forceLogin) {
+            // update the user token and send it back
+            loggedUsers.put(u.username, newjwt);
+            return WinsomeJWT.wrapWithMessageJSON(newjwt, "user was already logged, previous sessions are now invalid");
           } else {
-            // always send back the refreshed token, but creates an error
-            return WinsomeJWT.wrapWithMessageJSON(newjwt, "user was already logged, previous sessions are now invalid")
-                .flatMap(json -> Either.left(json));
+            // it is an error
+            return Either.left("user seems to be already logged somewhere else");
           }
         });
   }

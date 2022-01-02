@@ -53,7 +53,7 @@ public class WinsomeTest {
       winsome
           .register(username, password, Arrays.asList("sport", "music", "wine"))
           .flatMap(__ -> sleep(1000L))
-          .flatMap(__ -> winsome.login(username, password))
+          .flatMap(__ -> winsome.login(username, password, true))
           .flatMap(this::tap)
           .flatMap(__ -> sleep(500L))
           .flatMap(__ -> winsome.createPost(username, "Shared Reference",
@@ -96,7 +96,7 @@ public class WinsomeTest {
       winsome
           .register(username, password, Arrays.asList("music", "love", "dance", "fruit"))
           .flatMap(__ -> sleep(500L))
-          .flatMap(__ -> winsome.login(username, password))
+          .flatMap(__ -> winsome.login(username, password, true))
           .flatMap(this::tap)
           .flatMap(__ -> sleep(2000L))
           .flatMap(__ -> winsome.listUsers(username))
@@ -152,7 +152,7 @@ public class WinsomeTest {
       winsome
           .register(username, password, Arrays.asList("music", "love"))
           .flatMap(__ -> sleep(500L))
-          .flatMap(__ -> winsome.login(username, password))
+          .flatMap(__ -> winsome.login(username, password, true))
           .flatMap(this::tap)
           .flatMap(__ -> sleep(3000L))
           .flatMap(__ -> winsome.listUsers(username))

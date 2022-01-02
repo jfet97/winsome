@@ -1,4 +1,4 @@
-package client.RMI;
+package client;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -140,7 +140,7 @@ public class ClientMain {
             break;
           }
           case "login": {
-            // login <username> <password>
+            // login <username> <password> [-f]
             //
             // login an user into winsome
 
@@ -315,18 +315,23 @@ public class ClientMain {
 
     if (!username.equals("")) {
       return Either.left("already logged as " + username);
-    } else if (tokens.size() != 3) {
-      return Either.left("Invalid use of command login.\nUse: login <username> <password>");
+    } else if ((tokens.size() != 3 && tokens.size() != 4) || (tokens.size() == 4 && !tokens.get(3).equals("-f"))) {
+      return Either.left("Invalid use of command login.\nUse: login <username> <password> [-f]");
     } else {
       var usernamePassword = User.of(tokens.get(1), tokens.get(2), new LinkedList<>(), false);
       var usernamePasswordJSON = usernamePassword.toJSON();
       var usernamePasswordJSONLength = usernamePasswordJSON.getBytes().length;
 
+      var isForced = tokens.size() == 4;
+
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", usernamePasswordJSONLength + "");
       headers.put("Content-Type", HttpResponse.MIME_APPLICATION_JSON);
 
-      var erequest = HttpRequest.buildPostRequest("/login", usernamePasswordJSON, headers);
+      var erequest = HttpRequest.buildPostRequest(
+          "/login" + (isForced ? "?force=true" : ""),
+          usernamePasswordJSON,
+          headers);
 
       var result = erequest.flatMap(r -> doRequest(r, input, output));
 
@@ -526,11 +531,11 @@ public class ClientMain {
 
   }
 
-  private static void serverStr(String str) {
+  private static void clientSays(String str) {
     System.out.println("Client: " + str);
   }
 
-  private static void clientStr(String str) {
+  private static void serverSays(String str) {
     System.out.println("Server: " + str);
   }
 

@@ -5,9 +5,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
-import io.vavr.Function2;
 import io.vavr.control.Either;
 
 public class HttpRequest {

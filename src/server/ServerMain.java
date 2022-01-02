@@ -319,15 +319,20 @@ public class ServerMain {
       try {
         var user = objectMapper.readValue(req.getBody(), User.class);
 
+        var forceLogin = false;
+        var queryParams = req.getQueryParams();
+        if (queryParams.containsKey("force") && queryParams.get("force").equals("true")) {
+          forceLogin = true;
+        }
+
         toRet = winsome
-            .login(user.username, user.password)
+            .login(user.username, user.password, forceLogin)
             .flatMap(jwtJSON -> HttpResponse.build200(
                 Feedback.right(jwtJSON).toJSON(),
                 HttpResponse.MIME_APPLICATION_JSON, true))
             .recoverWith(err -> HttpResponse.build400(
-                Feedback.error(err.contains("jwt") && err.contains("message") ? err : err).toJSON(),
-                HttpResponse.MIME_APPLICATION_JSON,
-                true));
+                Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                HttpResponse.MIME_APPLICATION_JSON, true));
 
       } catch (JsonProcessingException e) {
         e.printStackTrace();

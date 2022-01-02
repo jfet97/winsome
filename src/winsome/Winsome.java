@@ -111,6 +111,36 @@ public class Winsome {
         .map(u -> this.wallet.getWallet().get(u.username).stream().collect(Collectors.toList()));
   }
 
+  private Either<String, Post> cancelPost(String username, String postUuid) {
+    return nullGuard(username, "username")
+        .flatMap(__ -> nullGuard(postUuid, "postUuid"))
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(u -> {
+          var post = u.posts.get(postUuid);
+          var toRet = Either.<String, Post>right(post);
+
+          if (post != null) {
+            synchronized (post) {
+              // synchronized with rewinPost
+              post.justDeleted = true;
+
+              post.rewins
+                  .stream()
+                  .forEach(p -> {
+                    cancelPost(p.author, p.postUuid);
+                  });
+
+              this.postAuthors.remove(post.uuid);
+              u.posts.remove(post.uuid);
+            }
+          } else {
+            toRet = Either.left("unknown post");
+          }
+
+          return toRet;
+        });
+  }
+
   // ---------------------------------------
   // API
 
@@ -382,28 +412,7 @@ public class Winsome {
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
         .flatMap(u -> !loggedUsers.containsKey(u.username) ? Either.left("user is not logged") : Either.right(u))
-        .flatMap(u -> {
-          var post = u.posts.get(postUuid);
-          var toRet = Either.<String, Post>right(post);
-
-          if (post != null) {
-            synchronized (post) {
-              // synchronized with rewinPost
-              post.justDeleted = true;
-
-              post.rewins
-                  .stream()
-                  .forEach(p -> deletePost(p.author, p.postUuid));
-
-              this.postAuthors.remove(post.uuid);
-              u.posts.remove(post.uuid);
-            }
-          } else {
-            toRet = Either.left("unknown post");
-          }
-
-          return toRet;
-        });
+        .flatMap(u -> cancelPost(u.username, postUuid));
   }
 
   public Either<String, Post> rewinPost(String username, String author, String postUuid) {
@@ -436,7 +445,7 @@ public class Winsome {
           var toRet = Either.<String, Post>right(null);
 
           synchronized (post) {
-            // synchronized with deletePost
+            // synchronized with cancelPost
 
             if (post.justDeleted) {
               toRet = Either.left("the post has just been deleted");

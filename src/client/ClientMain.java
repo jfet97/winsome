@@ -228,7 +228,7 @@ public class ClientMain {
           case "unfollow": {
             // unfollow <username>
             //
-            // un follow an user
+            // unfollow an user
 
             System.out.println(
                 checkUserIsLogged()
@@ -266,7 +266,7 @@ public class ClientMain {
             System.out.println(
                 checkUserIsLogged()
                     .flatMap(__ -> handlePostCommand(tokens, input, output))
-                    .fold(s -> s, title -> "new potitlet created: " + title));
+                    .fold(s -> s, title -> "new post created: " + title));
             break;
           }
           case "show": {
@@ -314,8 +314,6 @@ public class ClientMain {
 
               }
 
-              // print posts
-
             }
             break;
           }
@@ -334,6 +332,11 @@ public class ClientMain {
             // rewin <idPost>
             //
             // rewin a post
+
+            System.out.println(
+                checkUserIsLogged()
+                    .flatMap(__ -> handleRewinCommand(tokens, input, output))
+                    .fold(s -> s, title -> "post rewined: " + title));
             break;
           }
           case "rate": {
@@ -769,6 +772,50 @@ public class ClientMain {
       headers.put("Authorization", "Bearer " + JWT);
 
       var erequest = HttpRequest.buildPostRequest("/users" + "/" + username + "/posts", post.toJSON(), headers);
+
+      var result = erequest.flatMap(r -> doRequest(r, input, output));
+
+      return result.flatMap(res -> {
+        // extract data from JSON
+        var body = res.getBody();
+
+        try {
+          var node = objectMapper.readTree(body);
+          var pointerRes = JsonPointer.compile("/res");
+          var pointerOk = JsonPointer.compile("/ok");
+
+          var isOk = node.at(pointerOk).asBoolean();
+          if (isOk) {
+            // res is expected to be a post
+            return Either.right(
+                objectMapper
+                    .convertValue(node.at(pointerRes), new TypeReference<Post>() {
+                    }).title);
+          } else {
+            return Either.left(node.at(pointerRes).asText());
+          }
+
+        } catch (Exception e) {
+          e.printStackTrace();
+          return Either.left(e.getMessage());
+        }
+      });
+
+    }
+  }
+
+  private static Either<String, String> handleRewinCommand(List<String> tokens, BufferedInputStream input,
+      PrintWriter output) {
+    if (tokens.size() != 2) {
+      return Either.left("Invalid use of command rewin.\nUse: rewin <idPost>");
+    } else {
+
+      var headers = new HashMap<String, String>();
+      headers.put("Content-Length", "0");
+      headers.put("Authorization", "Bearer " + JWT);
+
+      var erequest = HttpRequest.buildPostRequest("/users" + "/" + username + "/posts" + "?" +
+          "rewinPost=" + tokens.get(1), "", headers);
 
       var result = erequest.flatMap(r -> doRequest(r, input, output));
 

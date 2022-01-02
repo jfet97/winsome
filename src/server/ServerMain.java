@@ -813,10 +813,11 @@ public class ServerMain {
 
   private static void configureJExpressPostsHandlers(JExpress jexpress, ObjectMapper objectMapper, Winsome winsome) {
 
-    // add new post
+    // add new post or rewin an existing one
     jexpress.post(USERS_ROUTE + "/:user_id" + POSTS_ROUTE, (req, params, reply) -> {
 
       var toRet = Either.<String, HttpResponse>right(null);
+      var queryParams = req.getQueryParams();
 
       try {
         var user = (User) req.context;
@@ -828,6 +829,17 @@ public class ServerMain {
                   ToJSON.toJSON("unauthorized")).toJSON(),
               HttpResponse.MIME_APPLICATION_JSON,
               true);
+        } else if (queryParams.containsKey("rewinPost")) {
+          toRet = winsome
+              .getAuthorFromPostUuid(queryParams.get("rewinPost"))
+              .flatMap(a -> winsome.rewinPost(user.username, a, queryParams.get("rewinPost")))
+              .flatMap(p -> HttpResponse.build200(
+                  Feedback.right(p.toJSON()).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON, true))
+              .recoverWith(err -> HttpResponse.build400(
+                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON,
+                  true));
         } else {
           var post = objectMapper.readValue(req.getBody(), Post.class);
 
@@ -909,41 +921,6 @@ public class ServerMain {
                 Feedback.error(ToJSON.toJSON(err)).toJSON(),
                 HttpResponse.MIME_APPLICATION_JSON,
                 true));
-
-      } catch (Exception e) {
-        e.printStackTrace();
-        toRet = Either.left(e.getMessage());
-      }
-
-      reply.accept(toRet);
-    });
-
-    // rewin a post
-    jexpress.post(USERS_ROUTE + "/:user_id" + POSTS_ROUTE + "/:post_id", (req, params, reply) -> {
-
-      var toRet = Either.<String, HttpResponse>right(null);
-      var queryParams = req.getQueryParams();
-
-      try {
-        // authenticated user
-        var user = (User) req.context;
-
-        if (queryParams.containsKey("rewin") && queryParams.get("rewin").equals("true")) {
-          toRet = winsome
-              .rewinPost(user.username, params.get("user_id"), params.get("post_id"))
-              .flatMap(p -> HttpResponse.build200(
-                  Feedback.right(p.toJSON()).toJSON(),
-                  HttpResponse.MIME_APPLICATION_JSON, true))
-              .recoverWith(err -> HttpResponse.build400(
-                  Feedback.error(ToJSON.toJSON(err)).toJSON(),
-                  HttpResponse.MIME_APPLICATION_JSON,
-                  true));
-        } else {
-          toRet = HttpResponse.build400(
-              Feedback.error(ToJSON.toJSON("Missing 'rewin' param or 'rewin' param not true")).toJSON(),
-              HttpResponse.MIME_APPLICATION_JSON,
-              true);
-        }
 
       } catch (Exception e) {
         e.printStackTrace();

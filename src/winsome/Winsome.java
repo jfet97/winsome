@@ -47,6 +47,8 @@ public class Winsome {
   private final ConcurrentMap<String, User> network = new ConcurrentHashMap<>();
   @JsonProperty("loggedUsers")
   private final ConcurrentMap<String, String> loggedUsers = new ConcurrentHashMap<>();
+  @JsonProperty("postAuthors")
+  private final ConcurrentMap<String, String> postAuthors = new ConcurrentHashMap<>();
   @JsonProperty("wallet")
   private final Wallet wallet = Wallet.of();
 
@@ -87,7 +89,11 @@ public class Winsome {
             .toEither()
             .mapLeft(seq -> seq.mkString("\n"))
             .map(post -> Pair.of(u, post)))
-        .map(pair -> pair.fst().posts.computeIfAbsent(pair.snd().uuid, __ -> pair.snd()));
+        .map(pair -> pair.fst().posts
+            .compute(pair.snd().uuid, (k, v) -> {
+              this.postAuthors.put(pair.snd().uuid, pair.fst().username);
+              return pair.snd();
+            }));
   }
 
   private Either<String, List<Post>> viewUserBlog(String username) {
@@ -114,6 +120,12 @@ public class Winsome {
 
   public void setOnChangeFollowers(TriConsumer<String, String, Boolean> cb) {
     this.onChangeFollowers = cb;
+  }
+
+  public Either<String, String> getAuthorFromPostUuid(String uuid) {
+    var toRet = this.postAuthors.get(uuid);
+
+    return toRet == null ? Either.left("unknown post") : Either.right(toRet);
   }
 
   public void synchronizedActionOnFollowersOfUser(String username, Consumer<Set<String>> cb) {
@@ -255,7 +267,8 @@ public class Winsome {
 
     return nullGuard(username, "username")
         .flatMap(__ -> nullGuard(usernameToFollow, "usernameToFollow"))
-        .flatMap(__ -> username.equals(usernameToFollow) ? Either.left("an user cannot follow itself") : Either.right(null))
+        .flatMap(
+            __ -> username.equals(usernameToFollow) ? Either.left("an user cannot follow itself") : Either.right(null))
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .flatMap(u -> u == null ? Either.left("unknown user " + username)
             : Either.<String, User>right(network.get(usernameToFollow))
@@ -382,6 +395,7 @@ public class Winsome {
                   .stream()
                   .forEach(p -> deletePost(p.author, p.postUuid));
 
+              this.postAuthors.remove(post.uuid);
               u.posts.remove(post.uuid);
             }
           } else {
@@ -728,10 +742,18 @@ public class Winsome {
         .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
     loggedUsersLine += "}";
 
+    var postAuthorsLine = "\"postAuthors\":{";
+    postAuthorsLine += this.postAuthors.entrySet()
+        .stream()
+        .map(e -> "\"" + e.getKey() + "\":\"" + e.getValue() + "\"")
+        .reduce("", (acc, curr) -> acc.equals("") ? curr : acc + "," + curr);
+    postAuthorsLine += "}";
+
     return String.join("",
         "{",
         networkLine + ",",
         loggedUsersLine + ",",
+        postAuthorsLine + ",",
         "\"wallet\":" + wallet.toJSON(),
         "}");
   }

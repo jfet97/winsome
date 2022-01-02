@@ -15,6 +15,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.core.JsonPointer;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -128,7 +129,13 @@ public class ClientMain {
 
       while (true) {
         System.out.print("> ");
-        var tokens = Arrays.asList(scanner.nextLine().split(" "));
+        var tokens = new LinkedList<String>();
+
+        var m = Pattern.compile("([^\"]\\S*|\".+?\")\\s*").matcher(scanner.nextLine());
+        while (m.find()) {
+          tokens.add(m.group(1).replace("\"", ""));
+        }
+
         var op = "";
 
         try {
@@ -256,6 +263,11 @@ public class ClientMain {
             // post <title> <content>
             //
             // create a new post in my blog
+
+            System.out.println(
+                checkUserIsLogged()
+                    .flatMap(__ -> handlePostCommand(tokens, input, output))
+                    .fold(s -> s, s -> "new post created: " + s));
             break;
           }
           case "show": {
@@ -623,6 +635,51 @@ public class ClientMain {
     }
   }
 
+  private static Either<String, String> handlePostCommand(List<String> tokens, BufferedInputStream input,
+      PrintWriter output) {
+    if (tokens.size() != 3) {
+      return Either.left("Invalid use of command post.\nUse: post <title> <content>");
+    } else {
+
+      var post = Post.of(tokens.get(1), tokens.get(2), username);
+
+      var headers = new HashMap<String, String>();
+      headers.put("Content-Length", post.toJSON().getBytes().length + "");
+      headers.put("Authorization", "Bearer " + JWT);
+
+      var erequest = HttpRequest.buildPostRequest("/users" + "/" + username + "/posts", post.toJSON(), headers);
+
+      var result = erequest.flatMap(r -> doRequest(r, input, output));
+
+      return result.flatMap(res -> {
+        // extract data from JSON
+        var body = res.getBody();
+
+        try {
+          var node = objectMapper.readTree(body);
+          var pointerRes = JsonPointer.compile("/res");
+          var pointerOk = JsonPointer.compile("/ok");
+
+          var isOk = node.at(pointerOk).asBoolean();
+          if (isOk) {
+            // res is expected to be a post
+            return Either.right(
+                objectMapper
+                    .convertValue(node.at(pointerRes), new TypeReference<Post>() {
+                    }).title);
+          } else {
+            return Either.left(node.at(pointerRes).asText());
+          }
+
+        } catch (Exception e) {
+          e.printStackTrace();
+          return Either.left(e.getMessage());
+        }
+      });
+
+    }
+  }
+
   // do an HttpRequest, return a parsed HttpResponse
   private static Either<String, HttpResponse> doRequest(HttpRequest request, BufferedInputStream input,
       PrintWriter output) {
@@ -634,67 +691,67 @@ public class ClientMain {
     // parse response
     var octet = -1;
     var contentLength = -1;
-    var res = new ByteArrayBuilder();
 
-    // we have to detect the end of an HTTP response
-    try {
-      while ((octet = input.read()) != -1) {
-        res.append(octet);
+    try (var res = new ByteArrayBuilder();) {
 
-        if (contentLength != -1) {
-          // contentLength already extracted
-          contentLength--;
+      // we have to detect the end of an HTTP response
+      try {
+        while ((octet = input.read()) != -1) {
+          res.append(octet);
 
-          if (contentLength == 0) {
-            // we have just parsed all the response
-            break;
-          } else {
-            // some chars of the response are still missing
+          if (contentLength != -1) {
+            // contentLength already extracted
+            contentLength--;
+
+            if (contentLength == 0) {
+              // we have just parsed all the response
+              break;
+            } else {
+              // some chars of the response are still missing
+              continue;
+            }
+          }
+
+          // looking for the sequence CR LF CR LF
+          if (new String(res.toByteArray()).lastIndexOf("\r\n\r\n") == -1) {
+            // not found, try again
             continue;
           }
+
+          // parse the request to extract Content-Length header
+          var eres = HttpResponse.parse(new String(res.toByteArray()));
+
+          // invalid http response because parser has failed
+          if (eres.isLeft()) {
+            return Either.left(eres.getLeft());
+          }
+
+          var contentLengthHeader = eres.get().getHeaders().get("Content-Length");
+          var isThereContentLengthHeader = contentLengthHeader != null;
+
+          if (!isThereContentLengthHeader) {
+            return Either.left("Invalid HTTP response: missing Content-Length header");
+          }
+
+          contentLength = Integer.parseInt(contentLengthHeader);
+
         }
-
-        // looking for the sequence CR LF CR LF
-        if (new String(res.toByteArray()).lastIndexOf("\r\n\r\n") == -1) {
-          // not found, try again
-          continue;
-        }
-
-        // parse the request to extract Content-Length header
-        var eres = HttpResponse.parse(new String(res.toByteArray()));
-
-        // invalid http response because parser has failed
-        if (eres.isLeft()) {
-          return Either.left(eres.getLeft());
-        }
-
-        var contentLengthHeader = eres.get().getHeaders().get("Content-Length");
-        var isThereContentLengthHeader = contentLengthHeader != null;
-
-        if (!isThereContentLengthHeader) {
-          return Either.left("Invalid HTTP response: missing Content-Length header");
-        }
-
-        contentLength = Integer.parseInt(contentLengthHeader);
-
+      } catch (IOException e) {
+        e.printStackTrace();
+        return Either.left(e.getMessage());
       }
-    } catch (IOException e) {
-      e.printStackTrace();
-      return Either.left(e.getMessage());
+
+      var resp = HttpResponse.parse(new String(res.toByteArray()));
+
+      resp.forEach(r -> {
+        if (r.getStatusCode().equals("401")) {
+          System.out.println("you have been logged out because of an unauthorized request");
+          onLogout.run();
+        }
+      });
+
+      return resp;
     }
-
-    var resp = HttpResponse.parse(new String(res.toByteArray()));
-
-    resp.forEach(r -> {
-      if (r.getStatusCode().equals("401")) {
-        System.out.println("you have been logged out because of an unauthorized request");
-        onLogout.run();
-      }
-    });
-
-    res.close();
-
-    return resp;
 
   }
 

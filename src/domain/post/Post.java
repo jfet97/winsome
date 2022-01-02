@@ -1,10 +1,13 @@
 package domain.post;
 
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import domain.comment.Comment;
@@ -24,6 +27,13 @@ public class Post {
   public List<Comment> comments;
   public List<Reaction> reactions;
   public Long walletScannerIteration;
+
+  // to store unknown properties
+  public Map<String, Object> unknowns = new HashMap<>();
+  @JsonAnySetter
+  void setDetail(String key, Object value) {
+    unknowns.put(key, value);
+  }
 
   public static Post of(String title, String content, String author) {
 

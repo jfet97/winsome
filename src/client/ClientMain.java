@@ -209,7 +209,7 @@ public class ClientMain {
                   .stream()
                   .forEach(ut -> System.out.format(leftAlignFormat, ut.username,
                       ut.tags.stream().reduce("", (a, v) -> a.equals("") ? v : a + ", " + v)));
-              System.out.println("");
+
             }
             break;
           }
@@ -255,7 +255,6 @@ public class ClientMain {
               userTags
                   .stream()
                   .forEach(ps -> System.out.format(leftAlignFormat, ps.author, ps.title, ps.uuid));
-              System.out.println("");
             }
             break;
           }
@@ -275,6 +274,49 @@ public class ClientMain {
             //
             // show my feed
             // show a specific post
+
+            var eres = checkUserIsLogged()
+                .flatMap(__ -> handleShowCommand(tokens, input, output));
+
+            if (eres.isLeft()) {
+              System.out.println(eres.getLeft());
+            } else {
+              var eres2 = eres.get();
+
+              if (eres2.isLeft()) {
+                // show post <id> command has ended successfully
+                var post = eres2.getLeft();
+
+                System.out.printf("%s%s\n", "Title: ", post.title);
+                System.out.printf("%s%s\n", "Content: ", post.content);
+                System.out.printf("%s%d%s%d%s\n", "Votes: ",
+                    Integer.parseInt((String) post.unknowns.get("upvotes")),
+                    " upvotes, ",
+                    Integer.parseInt((String) post.unknowns.get("upvotes")),
+                    " downvotes");
+                System.out.println("Comments:");
+
+                post.comments
+                    .stream()
+                    .map(c -> "\t" + c.author + ": " + c.text)
+                    .forEach(System.out::println);
+
+              } else {
+                // show feed command has ended successfully
+                var posts = eres2.get();
+
+                String leftAlignFormat = "| %-15s | %-20s | %-36s %n";
+                System.out.format(leftAlignFormat, "Author", "Title", "ID");
+
+                posts
+                    .stream()
+                    .forEach(p -> System.out.format(leftAlignFormat, p.author, p.title, p.uuid));
+
+              }
+
+              // print posts
+
+            }
             break;
           }
           case "delete": {
@@ -583,6 +625,80 @@ public class ClientMain {
                 objectMapper
                     .convertValue(node.at(pointerRes), new TypeReference<List<UserTags>>() {
                     }));
+          } else {
+            return Either.left(node.at(pointerRes).asText());
+          }
+
+        } catch (Exception e) {
+          e.printStackTrace();
+          return Either.left(e.getMessage());
+        }
+      });
+
+    }
+  }
+
+  private static Either<String, Either<Post, List<Post>>> handleShowCommand(List<String> tokens,
+      BufferedInputStream input,
+      PrintWriter output) {
+
+    var isShowFeed = tokens.size() == 2;
+    var isShowPost = tokens.size() == 3;
+
+    if (!isShowFeed && !isShowPost) {
+      return Either.left("Invalid use of command show.\nUse: show feed || show post <id>");
+    } else if (isShowFeed && !tokens.get(1).equals("feed")) {
+      return Either.left("Invalid use of command show.\nUse: show feed || show post <id>");
+    } else if (isShowPost && !tokens.get(1).equals("post")) {
+      return Either.left("Invalid use of command show.\nUse: show feed || show post <id>");
+    } else {
+
+      var target = "/users" + "/" + username;
+
+      if (isShowFeed) {
+        target += "/feed";
+      } else if (isShowPost) {
+        target += "/posts" + "/" + tokens.get(2);
+      }
+
+      var headers = new HashMap<String, String>();
+      headers.put("Content-Length", "0");
+      headers.put("Authorization", "Bearer " + JWT);
+
+      var erequest = HttpRequest.buildGetRequest(target, headers);
+
+      var result = erequest.flatMap(r -> doRequest(r, input, output));
+
+      return result.flatMap(res -> {
+        // extract data from JSON
+        var body = res.getBody();
+
+        try {
+          var node = objectMapper.readTree(body);
+          var pointerRes = JsonPointer.compile("/res");
+          var pointerOk = JsonPointer.compile("/ok");
+
+          var isOk = node.at(pointerOk).asBoolean();
+          if (isOk) {
+            if (isShowFeed) {
+
+              // res is expected to be an array of Posts
+              var posts = objectMapper
+                  .convertValue(node.at(pointerRes), new TypeReference<List<Post>>() {
+                  });
+
+              return Either.right(Either.right(posts));
+            } else if (isShowPost) {
+
+              // res is expected to be a single Post
+              var post = objectMapper
+                  .convertValue(node.at(pointerRes), new TypeReference<Post>() {
+                  });
+
+              return Either.right(Either.left(post));
+            } else {
+              throw new RuntimeException("should not happen");
+            }
           } else {
             return Either.left(node.at(pointerRes).asText());
           }

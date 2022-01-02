@@ -18,7 +18,6 @@ import domain.user.User;
 import http.HttpRequest;
 import http.HttpResponse;
 import jexpress.JExpress;
-import secrets.Secrets;
 import utils.Wrapper;
 
 public class JExpressTest {
@@ -114,8 +113,8 @@ public class JExpressTest {
         .flatMap(req -> req.setHTTPVersion(HttpRequest.HTTPV11))
         .get();
 
-    var algorithm = Algorithm.HMAC256(Secrets.JWT_SIGN_SECRET);
-    // var algorithm = Algorithm.HMAC256(Secrets.JWT_SIGN_SECRET + " "); // invalid signature
+    var algorithm = Algorithm.HMAC256("ABCDE");
+    // var algorithm = Algorithm.HMAC256("ABCDE" + " "); // invalid signature
     var cal = Calendar.getInstance();
     cal.setTimeInMillis(new Date().getTime());
     cal.add(Calendar.DATE, 1);
@@ -173,7 +172,7 @@ public class JExpressTest {
       var error = false;
 
       try {
-        var verifier = JWT.require(Algorithm.HMAC256(Secrets.JWT_SIGN_SECRET))
+        var verifier = JWT.require(Algorithm.HMAC256("ABCDE"))
             .withClaimPresence("username")
             .build(); // Reusable verifier instance
         var dec = verifier.verify(token.substring(7));
@@ -201,7 +200,8 @@ public class JExpressTest {
       }
 
       if (error) {
-        var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.UNAUTHORIZED_401[0], HttpResponse.UNAUTHORIZED_401[1])
+        var response = HttpResponse
+            .build(HttpResponse.HTTPV11, HttpResponse.UNAUTHORIZED_401[0], HttpResponse.UNAUTHORIZED_401[1])
             .flatMap(req -> req.setHeader("Server", "nginx/0.8.54"))
             .flatMap(req -> req.setHeader("Date", "02 Jan 2012 02:33:17 GMT"))
             .flatMap(req -> req.setHeader("Content-Type", "text/html"))

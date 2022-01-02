@@ -25,7 +25,6 @@ import domain.user.UserTags;
 import http.HttpResponse;
 import io.vavr.control.Either;
 import jexpress.JExpress;
-import secrets.Secrets;
 import server.RMI.RemoteServer;
 import server.RMI.IRemoteServer;
 import utils.Pair;
@@ -85,6 +84,9 @@ public class ServerMain {
       winsome = Winsome.of();
     }
 
+    // set the jwt secret (used internally to ccreate access tokens)
+    winsome.setJWTSecret(config.jwt_secret);
+
     // RMI configuration
     var psr = configureRMI(winsome, config.remote_registry_port, config.stub_name);
     var stub = psr.snd();
@@ -105,7 +107,8 @@ public class ServerMain {
         configurePersistenceThread(winsome, config.persistence_interval, config.persistence_path));
 
     // jexpress framework handlers
-    configureJExpressHandlers(jexpress, objectMapper, winsome, config.multicast_ip + ":" + config.multicast_port);
+    configureJExpressHandlers(jexpress, objectMapper, winsome, config.jwt_secret,
+        config.multicast_ip + ":" + config.multicast_port);
 
     // server configuration
     var server = Server.of(jexpress, config.server_ip, config.tcp_port);
@@ -205,10 +208,10 @@ public class ServerMain {
   }
 
   private static void configureJExpressHandlers(JExpress jexpress, ObjectMapper objectMapper, Winsome winsome,
-      String multicastIpPort) {
+      String jwtSecret, String multicastIpPort) {
 
     // auth middleware
-    configureJExpressAuthMiddleware(jexpress, winsome);
+    configureJExpressAuthMiddleware(jexpress, winsome, jwtSecret);
 
     // CORS middleware
     configureJExpressCORSMiddleware(jexpress);
@@ -235,7 +238,7 @@ public class ServerMain {
 
   }
 
-  private static void configureJExpressAuthMiddleware(JExpress jexpress, Winsome winsome) {
+  private static void configureJExpressAuthMiddleware(JExpress jexpress, Winsome winsome, String jwtSecret) {
     jexpress.use((req, params, reply, next) -> {
 
       var target = req.getRequestTarget();
@@ -257,7 +260,7 @@ public class ServerMain {
         var jwt = token.substring(7);
 
         var euser = WinsomeJWT
-            .validateJWT(Secrets.JWT_SIGN_SECRET, jwt)
+            .validateJWT(jwtSecret, jwt)
             .flatMap(u -> winsome
                 .getUserJWT(u.username)
                 .flatMap(currJWT -> currJWT.equals(jwt) ? Either.right(u) : Either.left("invalid auth token")));
@@ -330,9 +333,14 @@ public class ServerMain {
             .flatMap(jwtJSON -> HttpResponse.build200(
                 Feedback.right(jwtJSON).toJSON(),
                 HttpResponse.MIME_APPLICATION_JSON, true))
-            .recoverWith(err -> HttpResponse.build400(
-                Feedback.error(ToJSON.toJSON(err)).toJSON(),
-                HttpResponse.MIME_APPLICATION_JSON, true));
+            .recoverWith(err -> err.equals("INVALID_JWT_SECRET") ? HttpResponse.build500(
+                Feedback.error(
+                    ToJSON.toJSON("internal server error")).toJSON(),
+                HttpResponse.MIME_APPLICATION_JSON, false)
+                : HttpResponse.build400(
+                    Feedback.error(
+                        ToJSON.toJSON(err)).toJSON(),
+                    HttpResponse.MIME_APPLICATION_JSON, true));
 
       } catch (JsonProcessingException e) {
         e.printStackTrace();
@@ -342,7 +350,7 @@ public class ServerMain {
             HttpResponse.MIME_APPLICATION_JSON, true);
       } catch (Exception e) {
         e.printStackTrace();
-        toRet = Either.left(e.getMessage());
+        toRet = Either.left("internal server error");
       }
 
       reply.accept(toRet);

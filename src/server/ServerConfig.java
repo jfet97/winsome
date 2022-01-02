@@ -1,17 +1,18 @@
 package server;
 
 public class ServerConfig {
-  public Integer tcp_port;
-  public Integer remote_registry_port;
-  public Integer udp_port;
-  public Integer multicast_port;
-  public String multicast_ip;
-  public String server_ip;
-  public String persistence_path;
-  public Integer author_percentage;
-  public Long persistence_interval;
-  public Long wallet_interval;
-  public String stub_name;
+  public final Integer tcp_port = null;
+  public final Integer remote_registry_port = null;
+  public final Integer udp_port = null;
+  public final Integer multicast_port = null;
+  public final String multicast_ip = null;
+  public final String server_ip = null;
+  public final String persistence_path = null;
+  public final Integer author_percentage = null;
+  public final Long persistence_interval = null;
+  public final Long wallet_interval = null;
+  public final String stub_name = null;
+  public final String jwt_secret = null;
 
   public Boolean isValid() {
     return tcp_port != null && tcp_port != 0 &&
@@ -24,6 +25,7 @@ public class ServerConfig {
         author_percentage != null && author_percentage != 0 &&
         persistence_interval != null && persistence_interval != 0 &&
         wallet_interval != null && wallet_interval != 0 &&
-        stub_name != null && !stub_name.equals("");
+        stub_name != null && !stub_name.equals("") &&
+        jwt_secret != null && !jwt_secret.equals("");
   }
 }

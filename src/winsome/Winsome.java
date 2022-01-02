@@ -17,6 +17,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import domain.comment.Comment;
@@ -32,13 +33,14 @@ import domain.user.UserFactory;
 import domain.wallet.Wallet;
 import domain.wallet.WalletTransaction;
 import io.vavr.control.Either;
-import secrets.Secrets;
 import utils.HashPassword;
 import utils.Pair;
 import utils.TriConsumer;
 import utils.Triple;
 import utils.Wrapper;
 
+// to ignore JWT_SIGN_SECRET
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Winsome {
 
   @JsonProperty("network")
@@ -47,6 +49,8 @@ public class Winsome {
   private final ConcurrentMap<String, String> loggedUsers = new ConcurrentHashMap<>();
   @JsonProperty("wallet")
   private final Wallet wallet = Wallet.of();
+
+  private String JWT_SIGN_SECRET = "";
 
   private TriConsumer<String, String, Boolean> onChangeFollowers = (performer, receiver, hasFollowed) -> {
   };
@@ -103,6 +107,10 @@ public class Winsome {
 
   // ---------------------------------------
   // API
+
+  public void setJWTSecret(String jwtSecret) {
+    this.JWT_SIGN_SECRET = jwtSecret != null ? jwtSecret : "";
+  }
 
   public void setOnChangeFollowers(TriConsumer<String, String, Boolean> cb) {
     this.onChangeFollowers = cb;
@@ -171,13 +179,14 @@ public class Winsome {
     return nullGuard(username, "username")
         .flatMap(__ -> nullGuard(password, "password"))
         .flatMap(__ -> nullGuard(password, "jwt"))
+        .flatMap(__ -> JWT_SIGN_SECRET.equals("") ? Either.left("INVALID_JWT_SECRET") : Either.right(null))
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .flatMap(u -> u == null ? Either.left("unknown user") : Either.right(u))
         .flatMap(u -> !HashPassword.hash(password).equals(u.password) ? Either.left("invalid password")
             : Either.right(u))
         .flatMap(u -> {
 
-          var newjwt = WinsomeJWT.createJWT(Secrets.JWT_SIGN_SECRET, username);
+          var newjwt = WinsomeJWT.createJWT(JWT_SIGN_SECRET, username);
           var currJWT = loggedUsers.putIfAbsent(u.username, newjwt);
 
           // putIfAbsent returns null if there was no previous mapping for the key

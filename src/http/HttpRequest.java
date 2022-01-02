@@ -296,4 +296,22 @@ public class HttpRequest {
           return toRet;
         });
   }
+
+  public static Either<String, HttpRequest> buildDeleteRequest(String requestTarget, String body,
+      Map<String, String> headers) {
+
+    return HttpRequest.build(HttpRequest.DELETE)
+        .flatMap(r -> r.setHTTPVersion(HTTPV11))
+        .flatMap(r -> r.setRequestTarget(requestTarget))
+        .flatMap(r -> {
+          var toRet = Either.<String, HttpRequest>right(r);
+
+          for (var entry : headers.entrySet()) {
+            toRet = toRet.flatMap(tr -> tr.setHeader(entry.getKey(), entry.getValue()));
+          }
+
+          return toRet;
+        })
+        .flatMap(r -> r.setBody(body));
+  }
 }

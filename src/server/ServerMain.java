@@ -238,6 +238,14 @@ public class ServerMain {
 
   }
 
+  // private static void configureJExpressAuthMiddlewareUNSAFE(JExpress jexpress,
+  // Winsome winsome, String jwtSecret, String user) {
+  // jexpress.use((req, params, reply, next) -> {
+  // req.context = User.of(user, "", new LinkedList<>());
+  // next.run();
+  // });
+  // }
+
   private static void configureJExpressAuthMiddleware(JExpress jexpress, Winsome winsome, String jwtSecret) {
     jexpress.use((req, params, reply, next) -> {
 

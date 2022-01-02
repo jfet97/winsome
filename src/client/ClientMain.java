@@ -1,9 +1,11 @@
 package client;
 
-import java.io.BufferedReader;
+import java.io.BufferedInputStream;
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.ConnectException;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -16,9 +18,11 @@ import java.util.function.Consumer;
 
 import com.fasterxml.jackson.core.JsonPointer;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.core.util.ByteArrayBuilder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import domain.jwt.WinsomeJWT;
+import domain.post.Post;
 import domain.user.User;
 import domain.user.UserTags;
 import http.HttpRequest;
@@ -45,7 +49,7 @@ public class ClientMain {
 
     var tcp_port = 12345;
     var server_ip = "192.168.1.113";
-    var auth_token_path = "/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/client/RMI/token.txt";
+    var auth_token_path = "/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/client/token.txt";
 
     System.out.println("welcome to Winsome CLI!");
 
@@ -72,7 +76,9 @@ public class ClientMain {
 
     try (var socket = new Socket(server_ip, tcp_port)) {
 
-      var inputStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+      // BufferedInputStream because I have to read a precise
+      // amount of bytes from the socket
+      var inputStream = new BufferedInputStream(socket.getInputStream());
       var outputStream = new PrintWriter(socket.getOutputStream(), true);
 
       onRefreshedJWT = jwt -> {
@@ -109,13 +115,15 @@ public class ClientMain {
 
       startCLI(inputStream, outputStream);
 
+    } catch (ConnectException e) {
+      System.out.println("Uh-oh, the server seems to be offline");
     } catch (IOException e) {
       e.printStackTrace();
     }
 
   }
 
-  public static void startCLI(BufferedReader input, PrintWriter output) {
+  public static void startCLI(BufferedInputStream input, PrintWriter output) {
     try (var scanner = new Scanner(System.in);) {
 
       while (true) {
@@ -189,7 +197,7 @@ public class ClientMain {
 
               // print users
               String leftAlignFormat = "| %-15s | %-30s %n";
-              System.out.format("| Username        | Tags %n");
+              System.out.format(leftAlignFormat, "Username", "Tags");
               userTags
                   .stream()
                   .forEach(ut -> System.out.format(leftAlignFormat, ut.username,
@@ -202,18 +210,46 @@ public class ClientMain {
             // follow <username>
             //
             // follow an user
+
+            System.out.println(
+                checkUserIsLogged()
+                    .flatMap(__ -> handleFollowCommand(tokens, input, output))
+                    .fold(s -> s, s -> s));
+
             break;
           }
           case "unfollow": {
             // unfollow <username>
             //
             // un follow an user
+
+            System.out.println(
+                checkUserIsLogged()
+                    .flatMap(__ -> handleUnfollowCommand(tokens, input, output))
+                    .fold(s -> s, s -> s));
             break;
           }
           case "blog": {
             // blog
             //
-            // view my onw posts
+            // view my own posts
+
+            var eres = checkUserIsLogged()
+                .flatMap(__ -> handleBlogCommand(tokens, input, output));
+
+            if (eres.isLeft()) {
+              System.out.println(eres.getLeft());
+            } else {
+              var userTags = eres.get();
+
+              // print users
+              String leftAlignFormat = "| %-15s | %-20s | %-36s %n";
+              System.out.format(leftAlignFormat, "Author", "Title", "ID");
+              userTags
+                  .stream()
+                  .forEach(ps -> System.out.format(leftAlignFormat, ps.author, ps.title, ps.uuid));
+              System.out.println("");
+            }
             break;
           }
           case "post": {
@@ -259,6 +295,15 @@ public class ClientMain {
             // show my own wallet
             break;
           }
+          case "whoami": {
+            // whoami
+
+            System.out.println(
+                checkUserIsLogged()
+                    .map(__ -> username)
+                    .fold(s -> s, s -> s));
+            break;
+          }
           default: {
             System.out.println(op.equals("") ? "Empty command" : "Unknown command " + op);
             break;
@@ -272,7 +317,83 @@ public class ClientMain {
     }
   }
 
-  private static Either<String, String> handleRegisterCommand(List<String> tokens, BufferedReader input,
+  private static Either<String, String> handleFollowCommand(List<String> tokens, BufferedInputStream input,
+      PrintWriter output) {
+    if (tokens.size() != 2) {
+      return Either.left("Invalid use of command follow.\nUse: follow <username>");
+    } else {
+      var newUser = User.of(tokens.get(1), " ", new LinkedList<String>(), false);
+      var newUserJSON = newUser.toJSON();
+      var newUserJSONLength = newUserJSON.getBytes().length;
+
+      var headers = new HashMap<String, String>();
+      headers.put("Content-Length", newUserJSONLength + "");
+      headers.put("Content-Type", HttpResponse.MIME_APPLICATION_JSON);
+      headers.put("Authorization", "Bearer " + JWT);
+
+      var erequest = HttpRequest.buildPostRequest("/users" + "/" + username + "/following", newUserJSON, headers);
+
+      var result = erequest.flatMap(r -> doRequest(r, input, output));
+
+      return result.flatMap(res -> {
+        var body = res.getBody();
+
+        // extract 'res' from JSON
+        try {
+          var node = objectMapper.readTree(body);
+
+          var pointer = JsonPointer.compile("/res");
+
+          return Either.right(node.at(pointer).asText());
+        } catch (Exception e) {
+          e.printStackTrace();
+          return Either.left(e.getMessage());
+        }
+
+      });
+    }
+
+  }
+
+  private static Either<String, String> handleUnfollowCommand(List<String> tokens, BufferedInputStream input,
+      PrintWriter output) {
+    if (tokens.size() != 2) {
+      return Either.left("Invalid use of command unfollow.\nUse: unfollow <username>");
+    } else {
+      var newUser = User.of(tokens.get(1), " ", new LinkedList<String>(), false);
+      var newUserJSON = newUser.toJSON();
+      var newUserJSONLength = newUserJSON.getBytes().length;
+
+      var headers = new HashMap<String, String>();
+      headers.put("Content-Length", newUserJSONLength + "");
+      headers.put("Content-Type", HttpResponse.MIME_APPLICATION_JSON);
+      headers.put("Authorization", "Bearer " + JWT);
+
+      var erequest = HttpRequest.buildDeleteRequest("/users" + "/" + username + "/following", newUserJSON, headers);
+
+      var result = erequest.flatMap(r -> doRequest(r, input, output));
+
+      return result.flatMap(res -> {
+        var body = res.getBody();
+
+        // extract 'res' from JSON
+        try {
+          var node = objectMapper.readTree(body);
+
+          var pointer = JsonPointer.compile("/res");
+
+          return Either.right(node.at(pointer).asText());
+        } catch (Exception e) {
+          e.printStackTrace();
+          return Either.left(e.getMessage());
+        }
+
+      });
+    }
+
+  }
+
+  private static Either<String, String> handleRegisterCommand(List<String> tokens, BufferedInputStream input,
       PrintWriter output) {
 
     if (tokens.size() < 4) {
@@ -310,7 +431,7 @@ public class ClientMain {
 
   }
 
-  private static Either<String, Pair<String, String>> handleLoginCommand(List<String> tokens, BufferedReader input,
+  private static Either<String, Pair<String, String>> handleLoginCommand(List<String> tokens, BufferedInputStream input,
       PrintWriter output) {
 
     if (!username.equals("")) {
@@ -367,7 +488,7 @@ public class ClientMain {
 
   }
 
-  private static Either<String, String> handleLogoutCommand(List<String> tokens, BufferedReader input,
+  private static Either<String, String> handleLogoutCommand(List<String> tokens, BufferedInputStream input,
       PrintWriter output) {
     if (tokens.size() != 1) {
       return Either.left("Invalid use of command logout.\nUse: logout");
@@ -400,7 +521,7 @@ public class ClientMain {
     }
   }
 
-  private static Either<String, List<UserTags>> handleListCommand(List<String> tokens, BufferedReader input,
+  private static Either<String, List<UserTags>> handleListCommand(List<String> tokens, BufferedInputStream input,
       PrintWriter output) {
 
     if (tokens.size() != 2) {
@@ -458,8 +579,52 @@ public class ClientMain {
     }
   }
 
+  private static Either<String, List<Post>> handleBlogCommand(List<String> tokens, BufferedInputStream input,
+      PrintWriter output) {
+
+    if (tokens.size() != 1) {
+      return Either.left("Invalid use of command blog.\nUse: blog");
+    } else {
+
+      var headers = new HashMap<String, String>();
+      headers.put("Content-Length", "0");
+      headers.put("Authorization", "Bearer " + JWT);
+
+      var erequest = HttpRequest.buildGetRequest("/users" + "/" + username + "/blog", headers);
+
+      var result = erequest.flatMap(r -> doRequest(r, input, output));
+
+      return result.flatMap(res -> {
+        // extract data from JSON
+        var body = res.getBody();
+
+        try {
+          var node = objectMapper.readTree(body);
+          var pointerRes = JsonPointer.compile("/res");
+          var pointerOk = JsonPointer.compile("/ok");
+
+          var isOk = node.at(pointerOk).asBoolean();
+          if (isOk) {
+            // res is expected to be an array of UserTags
+            return Either.right(
+                objectMapper
+                    .convertValue(node.at(pointerRes), new TypeReference<List<Post>>() {
+                    }));
+          } else {
+            return Either.left(node.at(pointerRes).asText());
+          }
+
+        } catch (Exception e) {
+          e.printStackTrace();
+          return Either.left(e.getMessage());
+        }
+      });
+
+    }
+  }
+
   // do an HttpRequest, return a parsed HttpResponse
-  private static Either<String, HttpResponse> doRequest(HttpRequest request, BufferedReader input,
+  private static Either<String, HttpResponse> doRequest(HttpRequest request, BufferedInputStream input,
       PrintWriter output) {
 
     // do request
@@ -467,14 +632,14 @@ public class ClientMain {
     output.flush();
 
     // parse response
-    var character = -1;
+    var octet = -1;
     var contentLength = -1;
-    var res = new StringBuilder();
+    var res = new ByteArrayBuilder();
 
     // we have to detect the end of an HTTP response
     try {
-      while ((character = input.read()) != -1) {
-        res.append((char) character);
+      while ((octet = input.read()) != -1) {
+        res.append(octet);
 
         if (contentLength != -1) {
           // contentLength already extracted
@@ -490,13 +655,13 @@ public class ClientMain {
         }
 
         // looking for the sequence CR LF CR LF
-        if (res.lastIndexOf("\r\n\r\n") == -1) {
+        if (new String(res.toByteArray()).lastIndexOf("\r\n\r\n") == -1) {
           // not found, try again
           continue;
         }
 
         // parse the request to extract Content-Length header
-        var eres = HttpResponse.parse(res.toString());
+        var eres = HttpResponse.parse(new String(res.toByteArray()));
 
         // invalid http response because parser has failed
         if (eres.isLeft()) {
@@ -518,7 +683,7 @@ public class ClientMain {
       return Either.left(e.getMessage());
     }
 
-    var resp = HttpResponse.parse(res.toString());
+    var resp = HttpResponse.parse(new String(res.toByteArray()));
 
     resp.forEach(r -> {
       if (r.getStatusCode().equals("401")) {
@@ -526,6 +691,8 @@ public class ClientMain {
         onLogout.run();
       }
     });
+
+    res.close();
 
     return resp;
 

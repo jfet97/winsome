@@ -267,7 +267,7 @@ public class ClientMain {
             System.out.println(
                 checkUserIsLogged()
                     .flatMap(__ -> handlePostCommand(tokens, input, output))
-                    .fold(s -> s, s -> "new post created: " + s));
+                    .fold(s -> s, title -> "new potitlet created: " + title));
             break;
           }
           case "show": {
@@ -281,6 +281,11 @@ public class ClientMain {
             // delete <idPost>
             //
             // delete a post
+
+            System.out.println(
+                checkUserIsLogged()
+                    .flatMap(__ -> handleDeleteCommand(tokens, input, output))
+                    .fold(s -> s, uuid -> "deleted post: " + uuid));
             break;
           }
           case "rewin": {
@@ -675,6 +680,55 @@ public class ClientMain {
           e.printStackTrace();
           return Either.left(e.getMessage());
         }
+      });
+
+    }
+  }
+
+  private static Either<String, String> handleDeleteCommand(List<String> tokens, BufferedInputStream input,
+      PrintWriter output) {
+    if (tokens.size() != 2) {
+      return Either.left("Invalid use of command delete.\nUse: delete <idPost>");
+    } else {
+
+      var headers = new HashMap<String, String>();
+      headers.put("Content-Length", "0");
+      headers.put("Authorization", "Bearer " + JWT);
+
+      var erequest = HttpRequest.buildDeleteRequest("/users" + "/" + username + "/posts" + "/" + tokens.get(1), "",
+          headers);
+
+      var result = erequest.flatMap(r -> doRequest(r, input, output));
+
+      return result.flatMap(res -> {
+        var body = res.getBody();
+
+        // extract 'res' from JSON
+
+        try {
+
+          var node = objectMapper.readTree(body);
+          var pointerRes = JsonPointer.compile("/res");
+          var pointerOk = JsonPointer.compile("/ok");
+
+          var isOk = node.at(pointerOk).asBoolean();
+
+          if (isOk) {
+            // res is expected to be a post
+            return Either.right(
+                objectMapper
+                    .convertValue(node.at(pointerRes), new TypeReference<Post>() {
+                    }).uuid);
+          } else {
+            // res is expected to be a string
+            return Either.left(node.at(pointerRes).asText());
+          }
+
+        } catch (Exception e) {
+          e.printStackTrace();
+          return Either.left(e.getMessage());
+        }
+
       });
 
     }

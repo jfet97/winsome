@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.ConnectException;
 import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MulticastSocket;
@@ -48,6 +47,7 @@ import http.HttpResponse;
 import io.vavr.control.Either;
 import server.RMI.IRemoteServer;
 import utils.Pair;
+import utils.TriConsumer;
 import utils.Wrapper;
 
 public class ClientMain {
@@ -65,8 +65,11 @@ public class ClientMain {
   };
   private static Runnable onLogout = () -> {
   };
-  private static Consumer<String> onLogin = username -> {
+  private static TriConsumer<String, BufferedInputStream, PrintWriter> onLogin = (username, i, o) -> {
   };
+
+  // reference to the multicast thread
+  private static Thread multicastThread = null;
 
   public static void main(String[] args) {
 
@@ -84,9 +87,9 @@ public class ClientMain {
     try {
       config = objectMapper.readValue(new File(args[0]), ClientConfig.class);
 
-      // if (!config.isValid()) {
-      //   throw new RuntimeException("invalid configuration");
-      // }
+      if (!config.isValid()) {
+        throw new RuntimeException("invalid configuration");
+      }
     } catch (Exception e) {
       throw new RuntimeException("cannot parse server configuration file: " + e.getMessage());
     }
@@ -96,6 +99,9 @@ public class ClientMain {
     var auth_token_path = config.auth_token_path;
     var remote_registry_port = config.remote_registry_port;
     var stub_name = config.stub_name;
+
+    // flag
+    var doInitialLogin = false;
 
     System.out.println("welcome to Winsome CLI!");
 
@@ -114,17 +120,6 @@ public class ClientMain {
     var remoteClient = Wrapper.<RemoteClient>of(null);
     var stub = Wrapper.<IRemoteClient>of(null);
 
-    // set on login callback
-    onLogin = (String username) -> {
-      try {
-        remoteClient.value = RemoteClient.of(username);
-        stub.value = (IRemoteClient) UnicastRemoteObject.exportObject(remoteClient.value, 0);
-        remoteServer.value.registerFollowersCallback(stub.value);
-      } catch (RemoteException e) {
-        e.printStackTrace();
-      }
-    };
-
     // try to recover the token of the previous session
     var path = Paths.get(auth_token_path);
     try {
@@ -137,7 +132,7 @@ public class ClientMain {
         System.out.println(eusername.getLeft() + ", please login again");
       } else {
         username = eusername.get();
-        onLogin.accept(username);
+        doInitialLogin = true;
         System.out.println("logged as " + username);
       }
 
@@ -146,7 +141,26 @@ public class ClientMain {
     }
 
     // -
-    // set onRefreshedJWT and onLogout callbacks
+    // set callbacks
+
+    // on login
+    onLogin = (String username, BufferedInputStream input, PrintWriter output) -> {
+      try {
+        remoteClient.value = RemoteClient.of(username);
+        stub.value = (IRemoteClient) UnicastRemoteObject.exportObject(remoteClient.value, 0);
+        remoteServer.value.registerFollowersCallback(stub.value);
+
+        // get multicast details
+        multicastThread = new Thread(configureMulticast(input, output)
+            .fold(e -> () -> System.out.println(e), r -> r));
+
+        // start the multicast thread
+        multicastThread.start();
+
+      } catch (RemoteException e) {
+        e.printStackTrace();
+      }
+    };
 
     // when the token is being refreshed
     onRefreshedJWT = jwt -> {
@@ -175,6 +189,8 @@ public class ClientMain {
       JWT = "";
       username = "";
 
+      multicastThread.interrupt();
+
       try {
         remoteServer.value.unregisterFollowersCallback(stub.value);
       } catch (RemoteException e1) {
@@ -197,17 +213,12 @@ public class ClientMain {
       var inputStream = new BufferedInputStream(socket.getInputStream());
       var outputStream = new PrintWriter(socket.getOutputStream(), true);
 
-      // get multicast details
-      var multicastThread = new Thread(configureMulticast(inputStream, outputStream)
-          .fold(e -> () -> System.out.println(e), r -> r));
-
-      // start the multicast thread
-      multicastThread.start();
+      if (doInitialLogin) {
+        onLogin.accept(username, inputStream, outputStream);
+      }
 
       // start the CLI
       startCLI(inputStream, outputStream, remoteServer, remoteClient);
-
-      multicastThread.join();
 
     } catch (ConnectException e) {
       System.out.println("Uh-oh, the server seems to be offline");
@@ -262,20 +273,28 @@ public class ClientMain {
             // open the multicast socket
             try (var ms = new MulticastSocket(port)) {
               // join the multicast group
-              ms.joinGroup(new InetSocketAddress(group, port), NetworkInterface.getByName("wlan1"));
 
-              while (true) {
+              var ia = new InetSocketAddress(group, port);
+              ms.joinGroup(ia, NetworkInterface.getByName("wlan1"));
+
+              while (!Thread.currentThread().isInterrupted()) {
                 // get the packet containing the push notification
                 var dp = new DatagramPacket(new byte[256], 256);
                 ms.receive(dp);
+
+                if (Thread.currentThread().isInterrupted()) {
+                  break;
+                }
 
                 var received = new String(dp.getData(), dp.getOffset(), dp.getLength());
 
                 System.out.println("\n-----------------------------------------------------------------");
                 System.out.println("received push notification from server: " + received);
-                System.out.printf("-----------------------------------------------------------------\n>");
+                System.out.printf("-----------------------------------------------------------------\n> ");
 
               }
+
+              ms.leaveGroup(ia, NetworkInterface.getByName("wlan1"));
 
             }
 
@@ -367,7 +386,7 @@ public class ClientMain {
             } else {
               var pair = eres.get();
               onRefreshedJWT.accept(pair.fst());
-              onLogin.accept(username);
+              onLogin.accept(username, input, output);
               System.out.println(pair.snd());
             }
 

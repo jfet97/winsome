@@ -1,15 +1,12 @@
 package client;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ConnectException;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -148,6 +145,36 @@ public class ClientMain {
         }
 
         switch (op) {
+          case "exit": {
+            System.exit(0);
+            break;
+          }
+          case "help": {
+            var toPrint = String.join("\n",
+                "help: get help",
+                "register <username> <password> <tags>: register a new user to winsome",
+                "login <username> <password> [-f]: login an user into winsome [force the refreshing of the token]",
+                "logout: logout the current user",
+                "list users: list users having at least one common tag with the current user",
+                "list followers: list the followers of the current user",
+                "list following: list the users followed by the current user",
+                "follow <username>: follow an user",
+                "unfollow <username>: unfollow an user",
+                "blog: view the posts of the current user",
+                "post <title> <content>: create a new post",
+                "show feed: show the feed of the current user",
+                "show post <id>: show a specific post",
+                "delete <idPost>: delete a specific post",
+                "rewin <idPost>: rewin a specific post",
+                "rate <idPost> +1/-1: rate a specific post",
+                "comment <idPost> <comment>: comment a specific post",
+                "wallet [btc]: show the wallet of the current user [in bitcoin]",
+                "whoami: show the current user",
+                "exit: exit");
+
+            System.out.println(toPrint);
+            break;
+          }
           case "register": {
             // register <username> <password> <tags>
             //

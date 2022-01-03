@@ -3,9 +3,11 @@ package server.RMI;
 import java.rmi.RemoteException;
 import java.rmi.server.RemoteObject;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import client.RMI.IRemoteClient;
@@ -16,43 +18,48 @@ import winsome.Winsome;
 public class RemoteServer extends RemoteObject implements IRemoteServer {
 
   Winsome winsome;
-  Consumer<String> onNewClientFollowersRegistration = u -> {
+  BiConsumer<String, IRemoteClient> onNewClientFollowersRegistration = (u, rc) -> {
   };
   private ConcurrentMap<String, IRemoteClient> remotes = new ConcurrentHashMap<>();
 
-  private RemoteServer(Winsome winsome, Consumer<String> onNewClientFollowersRegistration) {
+  private RemoteServer(Winsome winsome, BiConsumer<String, IRemoteClient> onNewClientFollowersRegistration) {
     super();
     this.winsome = winsome;
+    this.onNewClientFollowersRegistration = onNewClientFollowersRegistration;
   }
 
   @Override
-  public Either<String, User> signUp(String username, String password, List<String> tags)
+  public Either<String, String> signUp(String username, String password, List<String> tags)
       throws RemoteException {
 
     return winsome
-        .register(username, password, tags);
+        .register(username, password, tags).map(u -> u.username);
   }
 
   @Override
   public void registerFollowersCallback(IRemoteClient remoteClient) throws RemoteException {
     // putIfAbsent returns null if there was no previous mapping for the key
-    if (remotes.putIfAbsent(remoteClient.getUsername(), remoteClient) == null) {
-      onNewClientFollowersRegistration.accept(remoteClient.getUsername());
-    }
+    remotes.compute(remoteClient.getUsername(), (k, v) -> {
+      onNewClientFollowersRegistration.accept(k, remoteClient);
+      return remoteClient;
+    });
+
   }
 
   @Override
   public void unregisterFollowersCallback(IRemoteClient remoteClient) throws RemoteException {
     remotes.compute(remoteClient.getUsername(), (k, v) -> null);
+
+    System.out.println(remotes);
   }
 
   // not available to clients
-  public void notify(String performer, String receiver, Boolean hasFollowed) throws RemoteException {
+  public void notify(String performer, List<String> tags, String receiver, Boolean hasFollowed) throws RemoteException {
     remotes.computeIfPresent(receiver,
         (__, rc) -> {
           try {
             if (hasFollowed)
-              rc.newFollower(performer);
+              rc.newFollower(performer, tags);
             else
               rc.deleteFollower(performer);
           } catch (RemoteException e) {
@@ -63,7 +70,7 @@ public class RemoteServer extends RemoteObject implements IRemoteServer {
   }
 
   // not available to clients
-  public void replaceAll(String receiver, Set<String> fs) throws RemoteException {
+  public void replaceAll(String receiver, Map<String, List<String>> fs) throws RemoteException {
     remotes.computeIfPresent(receiver,
         (__, rc) -> {
           try {
@@ -75,7 +82,7 @@ public class RemoteServer extends RemoteObject implements IRemoteServer {
         });
   }
 
-  public static RemoteServer of(Winsome winsome, Consumer<String> onNewClientFollowersRegistration) {
+  public static RemoteServer of(Winsome winsome, BiConsumer<String, IRemoteClient> onNewClientFollowersRegistration) {
     return new RemoteServer(winsome, onNewClientFollowersRegistration);
   }
 

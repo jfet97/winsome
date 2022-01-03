@@ -4,3 +4,4 @@ bin
 .DS_Store
 *.mp4
 **/*.txt
+.VSCodeCounter

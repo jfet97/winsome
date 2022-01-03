@@ -9,7 +9,7 @@ import domain.user.User;
 import io.vavr.control.Either;
 
 public interface IRemoteServer extends Remote {
-  Either<String, User> signUp(String username, String password, List<String> tags) throws RemoteException;
+  Either<String, String> signUp(String username, String password, List<String> tags) throws RemoteException;
 
   public void registerFollowersCallback(IRemoteClient remoteClient) throws RemoteException;
 

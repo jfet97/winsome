@@ -10,7 +10,7 @@ import java.nio.file.Paths;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
@@ -30,6 +30,7 @@ import domain.reaction.Reaction;
 import domain.reaction.ReactionFactory;
 import domain.user.User;
 import domain.user.UserFactory;
+import domain.user.UserTags;
 import domain.wallet.Wallet;
 import domain.wallet.WalletTransaction;
 import io.vavr.control.Either;
@@ -54,7 +55,7 @@ public class Winsome {
 
   private String JWT_SIGN_SECRET = "";
 
-  private TriConsumer<String, String, Boolean> onChangeFollowers = (performer, receiver, hasFollowed) -> {
+  private TriConsumer<User, String, Boolean> onChangeFollowers = (performer, receiver, hasFollowed) -> {
   };
 
   // ---------------------------------------
@@ -109,11 +110,11 @@ public class Winsome {
     return nullGuard(username, "username")
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .map(u -> this.wallet
-        .getWallet()
-        .get(u.username)
-        .stream()
-        .map(WalletTransaction::clone)
-        .collect(Collectors.toList()));
+            .getWallet()
+            .get(u.username)
+            .stream()
+            .map(WalletTransaction::clone)
+            .collect(Collectors.toList()));
   }
 
   private Either<String, Post> cancelPost(String username, String postUuid) {
@@ -153,7 +154,7 @@ public class Winsome {
     this.JWT_SIGN_SECRET = jwtSecret != null ? jwtSecret : "";
   }
 
-  public void setOnChangeFollowers(TriConsumer<String, String, Boolean> cb) {
+  public void setOnChangeFollowers(TriConsumer<User, String, Boolean> cb) {
     this.onChangeFollowers = cb;
   }
 
@@ -161,13 +162,6 @@ public class Winsome {
     var toRet = this.postAuthors.get(uuid);
 
     return toRet == null ? Either.left("unknown post") : Either.right(toRet);
-  }
-
-  public void synchronizedActionOnFollowersOfUser(String username, Consumer<Set<String>> cb) {
-    this.network.computeIfPresent(username, (__, user) -> {
-      user.synchronizedActionOnFollowers(cb);
-      return user;
-    });
   }
 
   public Either<String, List<String>> getUserTags(String username) {
@@ -188,6 +182,13 @@ public class Winsome {
           else
             return Either.right(jwt);
         });
+  }
+
+  public void synchronizedActionOnFollowersOfUser(String username, Consumer<List<String>> cb) {
+    this.network.computeIfPresent(username, (__, user) -> {
+      user.synchronizedActionOnFollowers(cb);
+      return user;
+    });
   }
 
   public Either<String, User> register(String username, String password, List<String> tags) {
@@ -320,7 +321,7 @@ public class Winsome {
             }
           }
           if (b1 && b2) {
-            onChangeFollowers.accept(p.fst().username, p.snd().username, true);
+            onChangeFollowers.accept(p.fst(), p.snd().username, true);
             return Either.<String, Void>right(null);
           } else {
             return Either.left(username + " was already following " + usernameToFollow);
@@ -350,7 +351,7 @@ public class Winsome {
             }
           }
           if (b1 && b2) {
-            onChangeFollowers.accept(p.fst().username, p.snd().username, false);
+            onChangeFollowers.accept(p.fst(), p.snd().username, false);
             return Either.<String, Void>right(null);
           } else {
             return Either.left(username + " wasn't following " + usernameToUnfollow);

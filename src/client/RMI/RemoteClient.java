@@ -2,13 +2,15 @@ package client.RMI;
 
 import java.rmi.RemoteException;
 import java.rmi.server.RemoteObject;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class RemoteClient extends RemoteObject implements IRemoteClient {
 
-  String username = "";
-  Set<String> followers = new HashSet<>();
+  private String username = "";
+  private Map<String, List<String>> followers = new HashMap<>();
 
   private RemoteClient(String username) {
     super();
@@ -16,15 +18,17 @@ public class RemoteClient extends RemoteObject implements IRemoteClient {
   }
 
   @Override
-  public void replaceFollowers(Set<String> fs) throws RemoteException {
+  public void replaceFollowers(Map<String, List<String>> fs) throws RemoteException {
     if (fs != null)
       this.followers = fs;
+
+    fs.entrySet().stream().forEach(System.out::println);
   }
 
   @Override
-  public void newFollower(String user) throws RemoteException {
+  public void newFollower(String user, List<String> tags) throws RemoteException {
     if (user != null)
-      this.followers.add(user);
+      this.followers.compute(user, (k, v) -> tags);
   }
 
   @Override
@@ -35,7 +39,11 @@ public class RemoteClient extends RemoteObject implements IRemoteClient {
 
   @Override
   public String getUsername() throws RemoteException {
-    return null;
+    return username;
+  }
+
+  public Map<String, List<String>> getFollowers() throws RemoteException {
+    return Collections.unmodifiableMap(followers);
   }
 
   public static RemoteClient of(String username) {

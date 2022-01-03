@@ -72,9 +72,9 @@ public class User {
     }
   }
 
-  public void synchronizedActionOnFollowers(Consumer<Set<String>> cb) {
+  public void synchronizedActionOnFollowers(Consumer<List<String>> cb) {
     synchronized (this.followers) {
-      cb.accept(this.followers.stream().collect(Collectors.toSet()));
+      cb.accept(this.followers.stream().collect(Collectors.toList()));
     }
   }
 

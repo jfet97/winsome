@@ -7,6 +7,11 @@ import java.net.ConnectException;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.rmi.NotBoundException;
+import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.server.UnicastRemoteObject;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -14,12 +19,15 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.JsonPointer;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.core.util.ByteArrayBuilder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import client.RMI.IRemoteClient;
+import client.RMI.RemoteClient;
 import domain.comment.Comment;
 import domain.jwt.WinsomeJWT;
 import domain.post.Post;
@@ -30,7 +38,9 @@ import domain.wallet.WalletTransaction;
 import http.HttpRequest;
 import http.HttpResponse;
 import io.vavr.control.Either;
+import server.RMI.IRemoteServer;
 import utils.Pair;
+import utils.Wrapper;
 
 public class ClientMain {
 
@@ -41,10 +51,13 @@ public class ClientMain {
   private static String JWT = "";
   // current username
   private static String username = "";
+
   // utils
   private static Consumer<String> onRefreshedJWT = jtw -> {
   };
   private static Runnable onLogout = () -> {
+  };
+  private static Consumer<String> onLogin = username -> {
   };
 
   public static void main(String[] args) {
@@ -52,9 +65,41 @@ public class ClientMain {
     var tcp_port = 12345;
     var server_ip = "192.168.1.113";
     var auth_token_path = "/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/client/token.txt";
+    var remote_registry_port = 7777;
+    var stub_name = "winsome-asc";
 
     System.out.println("welcome to Winsome CLI!");
 
+    // jackson main instance
+    objectMapper = new ObjectMapper();
+
+    // remote method invocation
+    var remoteServer = Wrapper.<IRemoteServer>of(null);
+    try {
+      remoteServer.value = configureRMI(remote_registry_port, stub_name);
+    } catch (RemoteException e1) {
+      System.out.println("Uh-oh, the server seems to be offline");
+      return;
+    } catch (NotBoundException e1) {
+      System.out.println("Uh-oh, the server seems to be offline");
+      return;
+    }
+
+    var remoteClient = Wrapper.<RemoteClient>of(null);
+    var stub = Wrapper.<IRemoteClient>of(null);
+
+    // set on login callback
+    onLogin = (String username) -> {
+      try {
+        remoteClient.value = RemoteClient.of(username);
+        stub.value = (IRemoteClient) UnicastRemoteObject.exportObject(RemoteClient.of(username), 0);
+        remoteServer.value.registerFollowersCallback(stub.value);
+      } catch (RemoteException e) {
+        e.printStackTrace();
+      }
+    };
+
+    // try to recover the token of the previous session
     var path = Paths.get(auth_token_path);
     try {
 
@@ -66,6 +111,7 @@ public class ClientMain {
         System.out.println(eusername.getLeft() + ", please login again");
       } else {
         username = eusername.get();
+        onLogin.accept(username);
         System.out.println("logged as " + username);
       }
 
@@ -73,9 +119,50 @@ public class ClientMain {
       System.out.println("no auth token found, please login again");
     }
 
-    // jackson main instance
-    objectMapper = new ObjectMapper();
+    // set onRefreshedJWT and onLogout callbacks
 
+    // when the token is being refreshed
+    onRefreshedJWT = jwt -> {
+
+      // update username
+      JWT = jwt;
+      var eusername = WinsomeJWT.extractUsernameFromJWT(jwt);
+      if (eusername.isLeft()) {
+        System.out.println("something went wrong during token refreshing");
+        onLogout.run();
+        return;
+      } else {
+        username = eusername.get();
+      }
+
+      // update the file containing the token
+      try {
+        Files.write(path, jwt.getBytes());
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    };
+
+    // on logout
+    onLogout = () -> {
+      JWT = "";
+      username = "";
+
+      try {
+        remoteServer.value.unregisterFollowersCallback(stub.value);
+      } catch (RemoteException e1) {
+        e1.printStackTrace();
+      }
+
+      try {
+        // delete the stored token
+        Files.deleteIfExists(path);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    };
+
+    // open the tcp socker
     try (var socket = new Socket(server_ip, tcp_port)) {
 
       // BufferedInputStream because I have to read a precise
@@ -83,49 +170,27 @@ public class ClientMain {
       var inputStream = new BufferedInputStream(socket.getInputStream());
       var outputStream = new PrintWriter(socket.getOutputStream(), true);
 
-      onRefreshedJWT = jwt -> {
-        // on refreshed jwt
-
-        JWT = jwt;
-        var eusername = WinsomeJWT.extractUsernameFromJWT(jwt);
-        if (eusername.isLeft()) {
-          System.out.println("something went wrong during token refreshing");
-          onLogout.run();
-          return;
-        } else {
-          username = eusername.get();
-        }
-
-        try {
-          Files.write(path, jwt.getBytes());
-        } catch (IOException e) {
-          e.printStackTrace();
-        }
-      };
-
-      onLogout = () -> {
-        // on logout
-        JWT = "";
-        username = "";
-
-        try {
-          Files.deleteIfExists(path);
-        } catch (IOException e) {
-          e.printStackTrace();
-        }
-      };
-
-      startCLI(inputStream, outputStream);
+      // start the CLI
+      startCLI(inputStream, outputStream, remoteServer, remoteClient);
 
     } catch (ConnectException e) {
       System.out.println("Uh-oh, the server seems to be offline");
-    } catch (IOException e) {
+    } catch (Exception e) {
       e.printStackTrace();
     }
 
   }
 
-  public static void startCLI(BufferedInputStream input, PrintWriter output) {
+  private static IRemoteServer configureRMI(Integer remoteRegistryPort,
+      String stubName)
+      throws RemoteException, NotBoundException {
+
+    return (IRemoteServer) LocateRegistry.getRegistry(remoteRegistryPort).lookup(stubName);
+
+  }
+
+  public static void startCLI(BufferedInputStream input, PrintWriter output, Wrapper<IRemoteServer> remoteServer,
+      Wrapper<RemoteClient> remoteClient) {
     try (var scanner = new Scanner(System.in);) {
 
       while (true) {
@@ -181,8 +246,13 @@ public class ClientMain {
             // register a new user to winsome
 
             System.out.println(
-                handleRegisterCommand(tokens, input, output)
+                checkUserIsNotLogged()
+                    .flatMap(__ -> handleRegisterCommandRMI(tokens, input, output, remoteServer.value))
                     .fold(s -> s, s -> s));
+
+            // System.out.println(
+            // handleRegisterCommandTCP(tokens, input, output)
+            // .fold(s -> s, s -> s));
             break;
           }
           case "login": {
@@ -197,6 +267,7 @@ public class ClientMain {
             } else {
               var pair = eres.get();
               onRefreshedJWT.accept(pair.fst());
+              onLogin.accept(username);
               System.out.println(pair.snd());
             }
 
@@ -226,7 +297,7 @@ public class ClientMain {
             // list users I follow
 
             var eres = checkUserIsLogged()
-                .flatMap(__ -> handleListCommand(tokens, input, output));
+                .flatMap(__ -> handleListCommand(tokens, input, output, remoteClient.value));
 
             if (eres.isLeft()) {
               System.out.println(eres.getLeft());
@@ -526,7 +597,28 @@ public class ClientMain {
 
   }
 
-  private static Either<String, String> handleRegisterCommand(List<String> tokens, BufferedInputStream input,
+  private static Either<String, String> handleRegisterCommandRMI(List<String> tokens, BufferedInputStream input,
+      PrintWriter output, IRemoteServer remoteServer) {
+
+    if (tokens.size() < 4) {
+      return Either.left("Invalid use of command register.\nUse: register <username> <password> <tags>");
+    } else {
+      var username = tokens.get(1);
+      var password = tokens.get(2);
+      var tags = new ArrayList<>(tokens.subList(3, tokens.size()));
+
+      try {
+        return remoteServer.signUp(username, password, tags)
+            .map(u -> "successfully registered a new user: " + u);
+      } catch (RemoteException e) {
+        e.printStackTrace();
+        return Either.left(e.getMessage());
+      }
+    }
+
+  }
+
+  private static Either<String, String> handleRegisterCommandTCP(List<String> tokens, BufferedInputStream input,
       PrintWriter output) {
 
     if (tokens.size() < 4) {
@@ -655,7 +747,7 @@ public class ClientMain {
   }
 
   private static Either<String, List<UserTags>> handleListCommand(List<String> tokens, BufferedInputStream input,
-      PrintWriter output) {
+      PrintWriter output, RemoteClient remoteClient) {
 
     if (tokens.size() != 2) {
       return Either.left("Invalid use of command list.\nUse: list users || list followers || list following");
@@ -666,6 +758,28 @@ public class ClientMain {
 
       if (!isValidEndpoint) {
         return Either.left("Invalid use of command list.\nUse: list users || list followers || list following");
+      }
+
+      // handle list followers using the RemoteClient stub
+      if (endpoint.equals("followers")) {
+
+        try {
+          var toRet = remoteClient
+              .getFollowers()
+              .entrySet()
+              .stream()
+              .map(e -> UserTags.of(e.getKey(), e.getValue()))
+              .collect(Collectors.toList());
+
+          return Either.right(toRet);
+
+        } catch (RemoteException e) {
+
+          e.printStackTrace();
+
+          return Either.left(e.getMessage());
+        }
+
       }
 
       var target = "/";
@@ -1266,17 +1380,17 @@ public class ClientMain {
 
   }
 
-  private static void clientSays(String str) {
-    System.out.println("Client: " + str);
-  }
-
-  private static void serverSays(String str) {
-    System.out.println("Server: " + str);
-  }
-
   private static Either<String, Void> checkUserIsLogged() {
     if (username.equals("")) {
-      return Either.left("user is not logged");
+      return Either.left("error: user is not logged");
+    } else {
+      return Either.right(null);
+    }
+  }
+
+  private static Either<String, Void> checkUserIsNotLogged() {
+    if (!username.equals("")) {
+      return Either.left("error: user is logged");
     } else {
       return Either.right(null);
     }

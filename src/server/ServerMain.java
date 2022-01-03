@@ -134,23 +134,41 @@ public class ServerMain {
       String stubName)
       throws RemoteException {
 
-    var remoteServerWrapped = Wrapper.<RemoteServer>of(null);
+    var remoteServer = Wrapper.<RemoteServer>of(null);
 
-    remoteServerWrapped.value = RemoteServer.of(winsome, username -> {
+    remoteServer.value = RemoteServer.of(winsome, (username, remoteClient) -> {
 
       // when a new user log in, send to him all its current followers
       // replacing whatever the client had before
+
       winsome.synchronizedActionOnFollowersOfUser(username, fs -> {
-        try {
-          remoteServerWrapped.value.replaceAll(username, fs);
-        } catch (RemoteException e) {
-          e.printStackTrace();
+        var eres = Either.sequence(
+            fs
+                .stream()
+                .map(f -> winsome
+                    .getUserTags(f)
+                    .map(ts -> UserTags.of(f, ts)))
+                .collect(Collectors.toList()))
+            .map(uts -> uts
+                .asJava()
+                .stream()
+                .collect(Collectors.toMap(ut -> ut.username, ut -> ut.tags)))
+            .mapLeft(es -> es.reduce((a, v) -> a + "\n" + v));
+
+        if (eres.isRight()) {
+          try {
+            remoteClient.replaceFollowers(eres.get());
+          } catch (RemoteException e) {
+            e.printStackTrace();
+          }
+        } else {
+          System.out.println(eres.getLeft());
         }
       });
 
     });
 
-    var stub = (IRemoteServer) UnicastRemoteObject.exportObject(remoteServerWrapped.value, 0);
+    var stub = (IRemoteServer) UnicastRemoteObject.exportObject(remoteServer.value, 0);
     LocateRegistry.createRegistry(remoteRegistryPort);
     LocateRegistry.getRegistry(remoteRegistryPort).rebind(stubName, stub);
 
@@ -160,14 +178,14 @@ public class ServerMain {
       // only do thread safe operations
 
       try {
-        remoteServerWrapped.value.notify(performer, receiver, hasFollowed);
+        remoteServer.value.notify(performer.username, performer.tags, receiver, hasFollowed);
       } catch (RemoteException e) {
         e.printStackTrace();
       }
 
     });
 
-    return Pair.of(remoteServerWrapped.value, stub);
+    return Pair.of(remoteServer.value, stub);
   }
 
   private static Pair<DatagramSocket, InetAddress> configureMulticast(Integer udp_port, String multicast_ip)

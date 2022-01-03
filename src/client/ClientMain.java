@@ -1,6 +1,7 @@
 package client;
 
 import java.io.BufferedInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.ConnectException;
@@ -69,16 +70,34 @@ public class ClientMain {
 
   public static void main(String[] args) {
 
-    var tcp_port = 12345;
-    var server_ip = "192.168.1.113";
-    var auth_token_path = "/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/client/token.txt";
-    var remote_registry_port = 7777;
-    var stub_name = "winsome-asc";
-
-    System.out.println("welcome to Winsome CLI!");
+    if (args.length < 1) {
+      System.out.println("Missing client configuration file.\nUse: java ClientMain path/to/config.json");
+      return;
+    }
 
     // jackson main instance
     objectMapper = new ObjectMapper();
+
+    // configs
+    var config = (ClientConfig) null;
+
+    try {
+      config = objectMapper.readValue(new File(args[0]), ClientConfig.class);
+
+      // if (!config.isValid()) {
+      //   throw new RuntimeException("invalid configuration");
+      // }
+    } catch (Exception e) {
+      throw new RuntimeException("cannot parse server configuration file: " + e.getMessage());
+    }
+
+    var tcp_port = config.tcp_port;
+    var server_ip = config.server_ip;
+    var auth_token_path = config.auth_token_path;
+    var remote_registry_port = config.remote_registry_port;
+    var stub_name = config.stub_name;
+
+    System.out.println("welcome to Winsome CLI!");
 
     // remote method invocation
     var remoteServer = Wrapper.<IRemoteServer>of(null);

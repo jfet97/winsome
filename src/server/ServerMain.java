@@ -49,7 +49,7 @@ public class ServerMain {
   public static void main(String[] args) throws RemoteException, UnknownHostException, SocketException {
 
     if (args.length < 1) {
-      System.out.println("Missing server configuration file.\nUse: java MainServer path/to/config.json");
+      System.out.println("Missing server configuration file.\nUse: java ServerMain path/to/config.json");
       return;
     }
 

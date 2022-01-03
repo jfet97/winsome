@@ -4,14 +4,11 @@ import java.rmi.RemoteException;
 import java.rmi.server.RemoteObject;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 import client.RMI.IRemoteClient;
-import domain.user.User;
 import io.vavr.control.Either;
 import winsome.Winsome;
 
@@ -49,8 +46,6 @@ public class RemoteServer extends RemoteObject implements IRemoteServer {
   @Override
   public void unregisterFollowersCallback(IRemoteClient remoteClient) throws RemoteException {
     remotes.compute(remoteClient.getUsername(), (k, v) -> null);
-
-    System.out.println(remotes);
   }
 
   // not available to clients

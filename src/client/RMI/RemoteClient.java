@@ -21,8 +21,6 @@ public class RemoteClient extends RemoteObject implements IRemoteClient {
   public void replaceFollowers(Map<String, List<String>> fs) throws RemoteException {
     if (fs != null)
       this.followers = fs;
-
-    fs.entrySet().stream().forEach(System.out::println);
   }
 
   @Override

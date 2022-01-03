@@ -92,7 +92,7 @@ public class ClientMain {
     onLogin = (String username) -> {
       try {
         remoteClient.value = RemoteClient.of(username);
-        stub.value = (IRemoteClient) UnicastRemoteObject.exportObject(RemoteClient.of(username), 0);
+        stub.value = (IRemoteClient) UnicastRemoteObject.exportObject(remoteClient.value, 0);
         remoteServer.value.registerFollowersCallback(stub.value);
       } catch (RemoteException e) {
         e.printStackTrace();

@@ -4,7 +4,14 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.ConnectException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.MulticastSocket;
+import java.net.NetworkInterface;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.rmi.NotBoundException;
@@ -119,6 +126,7 @@ public class ClientMain {
       System.out.println("no auth token found, please login again");
     }
 
+    // -
     // set onRefreshedJWT and onLogout callbacks
 
     // when the token is being refreshed
@@ -170,8 +178,17 @@ public class ClientMain {
       var inputStream = new BufferedInputStream(socket.getInputStream());
       var outputStream = new PrintWriter(socket.getOutputStream(), true);
 
+      // get multicast details
+      var multicastThread = new Thread(configureMulticast(inputStream, outputStream)
+          .fold(e -> () -> System.out.println(e), r -> r));
+
+      // start the multicast thread
+      multicastThread.start();
+
       // start the CLI
       startCLI(inputStream, outputStream, remoteServer, remoteClient);
+
+      multicastThread.join();
 
     } catch (ConnectException e) {
       System.out.println("Uh-oh, the server seems to be offline");
@@ -186,6 +203,70 @@ public class ClientMain {
       throws RemoteException, NotBoundException {
 
     return (IRemoteServer) LocateRegistry.getRegistry(remoteRegistryPort).lookup(stubName);
+
+  }
+
+  private static Either<String, Runnable> configureMulticast(BufferedInputStream input, PrintWriter output) {
+
+    var headers = new HashMap<String, String>();
+    headers.put("Content-Length", "0");
+    headers.put("Authorization", "Bearer " + JWT);
+
+    return HttpRequest.buildGetRequest("/multicast", headers)
+        .flatMap(req -> doRequest(req, input, output))
+        .flatMap(res -> {
+          var body = res.getBody();
+
+          // extract 'res' from JSON
+          try {
+            var node = objectMapper.readTree(body);
+
+            var pointer = JsonPointer.compile("/res");
+            var resValue = node.at(pointer).asText();
+
+            var ip = resValue.split(":")[0];
+            var port = Integer.parseInt(resValue.split(":")[1]);
+
+            return Either.right(Pair.of(ip, port));
+          } catch (Exception e) {
+            e.printStackTrace();
+            return Either.left(e.getMessage());
+          }
+        })
+        .map(pair -> () -> {
+          var ip = pair.fst();
+          var port = pair.snd();
+
+          try {
+            var group = InetAddress.getByName(ip);
+
+            // open the multicast socket
+            try (var ms = new MulticastSocket(port)) {
+              // join the multicast group
+              ms.joinGroup(new InetSocketAddress(group, port), NetworkInterface.getByName("wlan1"));
+
+              while (true) {
+                // get the packet containing the push notification
+                var dp = new DatagramPacket(new byte[256], 256);
+                ms.receive(dp);
+
+                var received = new String(dp.getData(), dp.getOffset(), dp.getLength());
+
+                System.out.println("\n-----------------------------------------------------------------");
+                System.out.println("received push notification from server: " + received);
+                System.out.printf("-----------------------------------------------------------------\n>");
+
+              }
+
+            }
+
+          } catch (UnknownHostException e1) {
+            e1.printStackTrace();
+          } catch (Exception e) {
+            e.printStackTrace();
+          }
+
+        });
 
   }
 
@@ -413,9 +494,7 @@ public class ClientMain {
                 posts
                     .stream()
                     .forEach(p -> System.out.format(leftAlignFormat, p.author, p.title, p.uuid));
-
               }
-
             }
             break;
           }
@@ -898,6 +977,7 @@ public class ClientMain {
       });
 
     }
+
   }
 
   private static Either<String, List<Post>> handleBlogCommand(List<String> tokens, BufferedInputStream input,
@@ -1252,6 +1332,59 @@ public class ClientMain {
     }
   }
 
+  private static Either<String, Pair<Double, List<WalletTransaction>>> handleWalletCommand(List<String> tokens,
+      BufferedInputStream input,
+      PrintWriter output) {
+
+    if ((tokens.size() != 1 && tokens.size() != 2) || (tokens.size() == 2 && !tokens.get(1).equals("btc"))) {
+      return Either.left("Invalid use of command wallet.\nUse: wallet || wallet btc");
+    } else {
+
+      var useBTC = tokens.size() == 2;
+      var currency = useBTC ? "currency=bitcoin" : "currency=wincoin";
+
+      var headers = new HashMap<String, String>();
+      headers.put("Content-Length", "0");
+      headers.put("Authorization", "Bearer " + JWT);
+
+      var erequest = HttpRequest.buildGetRequest("/users" + "/" + username + "/wallet" + "?" + currency, headers);
+
+      var result = erequest.flatMap(r -> doRequest(r, input, output));
+
+      return result.flatMap(res -> {
+        // extract data from JSON
+        var body = res.getBody();
+
+        try {
+          var node = objectMapper.readTree(body);
+          var pointerRes = JsonPointer.compile("/res");
+          var pointerResHistory = JsonPointer.compile("/res/history");
+          var pointerResTotal = JsonPointer.compile("/res/total");
+          var pointerOk = JsonPointer.compile("/ok");
+
+          var isOk = node.at(pointerOk).asBoolean();
+          if (isOk) {
+            // res is expected to be an object { history: Transaction[], total }
+            return Either.right(
+                Pair.of(
+                    node.at(pointerResTotal).asDouble(),
+                    objectMapper
+                        .convertValue(node.at(pointerResHistory), new TypeReference<List<WalletTransaction>>() {
+                        })));
+          } else {
+            return Either.left(node.at(pointerRes).asText());
+          }
+
+        } catch (Exception e) {
+          e.printStackTrace();
+          return Either.left(e.getMessage());
+        }
+      });
+
+    }
+
+  }
+
   // do an HttpRequest, return a parsed HttpResponse
   private static Either<String, HttpResponse> doRequest(HttpRequest request, BufferedInputStream input,
       PrintWriter output) {
@@ -1323,59 +1456,6 @@ public class ClientMain {
       });
 
       return resp;
-    }
-
-  }
-
-  private static Either<String, Pair<Double, List<WalletTransaction>>> handleWalletCommand(List<String> tokens,
-      BufferedInputStream input,
-      PrintWriter output) {
-
-    if ((tokens.size() != 1 && tokens.size() != 2) || (tokens.size() == 2 && !tokens.get(1).equals("btc"))) {
-      return Either.left("Invalid use of command wallet.\nUse: wallet || wallet btc");
-    } else {
-
-      var useBTC = tokens.size() == 2;
-      var currency = useBTC ? "currency=bitcoin" : "currency=wincoin";
-
-      var headers = new HashMap<String, String>();
-      headers.put("Content-Length", "0");
-      headers.put("Authorization", "Bearer " + JWT);
-
-      var erequest = HttpRequest.buildGetRequest("/users" + "/" + username + "/wallet" + "?" + currency, headers);
-
-      var result = erequest.flatMap(r -> doRequest(r, input, output));
-
-      return result.flatMap(res -> {
-        // extract data from JSON
-        var body = res.getBody();
-
-        try {
-          var node = objectMapper.readTree(body);
-          var pointerRes = JsonPointer.compile("/res");
-          var pointerResHistory = JsonPointer.compile("/res/history");
-          var pointerResTotal = JsonPointer.compile("/res/total");
-          var pointerOk = JsonPointer.compile("/ok");
-
-          var isOk = node.at(pointerOk).asBoolean();
-          if (isOk) {
-            // res is expected to be an object { history: Transaction[], total }
-            return Either.right(
-                Pair.of(
-                    node.at(pointerResTotal).asDouble(),
-                    objectMapper
-                        .convertValue(node.at(pointerResHistory), new TypeReference<List<WalletTransaction>>() {
-                        })));
-          } else {
-            return Either.left(node.at(pointerRes).asText());
-          }
-
-        } catch (Exception e) {
-          e.printStackTrace();
-          return Either.left(e.getMessage());
-        }
-      });
-
     }
 
   }

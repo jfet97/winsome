@@ -191,23 +191,23 @@ public class ServerMain {
   private static Pair<DatagramSocket, InetAddress> configureMulticast(Integer udp_port, String multicast_ip)
       throws UnknownHostException, SocketException {
 
-    try (var ds = new DatagramSocket(udp_port);) {
+    var ds = new DatagramSocket(udp_port);
 
-      // create and check the validity of the multicast group
-      var multicastGroup = InetAddress.getByName(multicast_ip);
-      if (!multicastGroup.isMulticastAddress()) {
-        ds.close();
-        throw new IllegalArgumentException(multicast_ip + " is not a multicast address");
-      }
-
-      return Pair.of(ds, multicastGroup);
+    // create and check the validity of the multicast group
+    var multicastGroup = InetAddress.getByName(multicast_ip);
+    if (!multicastGroup.isMulticastAddress()) {
+      ds.close();
+      throw new IllegalArgumentException(multicast_ip + " is not a multicast address");
     }
+
+    return Pair.of(ds, multicastGroup);
+
   }
 
   private static Runnable configureWalletThread(Winsome winsome, Long wallet_interval, Integer author_perc,
       InetAddress multicastGroup, Integer multicast_port, DatagramSocket ds) {
     return winsome.makeWalletRunnable(wallet_interval, author_perc, () -> {
-      var notification = "push";
+      var notification = "wallet updated";
       var notificationBytes = notification.getBytes();
 
       var dp = new DatagramPacket(notificationBytes, notificationBytes.length, multicastGroup, multicast_port);

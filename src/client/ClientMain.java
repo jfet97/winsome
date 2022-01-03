@@ -22,8 +22,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.core.util.ByteArrayBuilder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import domain.comment.Comment;
 import domain.jwt.WinsomeJWT;
 import domain.post.Post;
+import domain.reaction.Reaction;
 import domain.user.User;
 import domain.user.UserTags;
 import http.HttpRequest;
@@ -292,7 +294,7 @@ public class ClientMain {
                 System.out.printf("%s%d%s%d%s\n", "Votes: ",
                     Integer.parseInt((String) post.unknowns.get("upvotes")),
                     " upvotes, ",
-                    Integer.parseInt((String) post.unknowns.get("upvotes")),
+                    Integer.parseInt((String) post.unknowns.get("downvotes")),
                     " downvotes");
                 System.out.println("Comments:");
 
@@ -343,12 +345,32 @@ public class ClientMain {
             // rate <idPost> +1/-1
             //
             // rate a post
+
+            var eres = checkUserIsLogged()
+                .flatMap(__ -> handleRateCommand(tokens, input, output));
+
+            if (eres.isLeft()) {
+              System.out.println(eres.getLeft());
+            } else {
+              var reaction = eres.get();
+              System.out.println("successfully added a " + (reaction.isUpvote ? "positive" : "negative") + " reaction");
+            }
             break;
           }
           case "comment": {
             // comment <idPost> <comment>
             //
             // comment a post
+
+            var eres = checkUserIsLogged()
+                .flatMap(__ -> handleCommentCommand(tokens, input, output));
+
+            if (eres.isLeft()) {
+              System.out.println(eres.getLeft());
+            } else {
+              var comment = eres.get();
+              System.out.println("successfully added a comment");
+            }
             break;
           }
           case "wallet": {
@@ -656,10 +678,10 @@ public class ClientMain {
       return Either.left("Invalid use of command show.\nUse: show feed || show post <id>");
     } else {
 
-      var target = "/users" + "/" + username;
+      var target = "";
 
       if (isShowFeed) {
-        target += "/feed";
+        target += "/users" + "/" + username + "/feed";
       } else if (isShowPost) {
         target += "/posts" + "/" + tokens.get(2);
       }
@@ -894,6 +916,176 @@ public class ClientMain {
 
       });
 
+    }
+  }
+
+  private static Either<String, Reaction> handleRateCommand(List<String> tokens, BufferedInputStream input,
+      PrintWriter output) {
+    if (tokens.size() != 3 || (!tokens.get(2).equals("+1") && !tokens.get(2).equals("-1"))) {
+      return Either.left("Invalid use of command rate.\nUse: rate <idPost> +1/-1");
+    } else {
+
+      var headers = new HashMap<String, String>();
+      headers.put("Content-Length", "0");
+      headers.put("Authorization", "Bearer " + JWT);
+
+      // 1 - get post's author
+      return HttpRequest
+          .buildGetRequest("/posts" + "/" + tokens.get(1) + "?author=true", headers)
+          .flatMap(r -> doRequest(r, input, output))
+          .flatMap(res -> {
+            var body = res.getBody();
+
+            try {
+
+              var node = objectMapper.readTree(body);
+              var pointerRes = JsonPointer.compile("/res");
+              var pointerOk = JsonPointer.compile("/ok");
+
+              var isOk = node.at(pointerOk).asBoolean();
+
+              if (isOk) {
+                // res is expected to be a string containing the author of the post
+                return Either.right(node.at(pointerRes).asText());
+              } else {
+                // res is expected to be a string
+                return Either.left(node.at(pointerRes).asText());
+              }
+
+            } catch (Exception e) {
+              e.printStackTrace();
+              return Either.left(e.getMessage());
+            }
+
+          })
+          .flatMap(a -> {
+
+            // 2 - rate the post
+            var isUpvote = tokens.get(2).equals("+1") ? true : false;
+            var reaction = Reaction.of(isUpvote, "", "").toJSON();
+
+            headers.put("Content-Length", reaction.getBytes().length + "");
+            headers.put("Content-Type", HttpResponse.MIME_APPLICATION_JSON);
+
+            return HttpRequest
+                .buildPostRequest("/users" + "/" + a + "/posts" + "/" + tokens.get(1) + "/reactions",
+                    reaction,
+                    headers);
+          })
+          .flatMap(r -> doRequest(r, input, output))
+          .flatMap(res -> {
+            var body = res.getBody();
+
+            try {
+
+              var node = objectMapper.readTree(body);
+              var pointerRes = JsonPointer.compile("/res");
+              var pointerOk = JsonPointer.compile("/ok");
+
+              var isOk = node.at(pointerOk).asBoolean();
+
+              if (isOk) {
+                // res is expected to be a reaction
+                return Either.right(
+                    objectMapper
+                        .convertValue(node.at(pointerRes), new TypeReference<Reaction>() {
+                        }));
+              } else {
+                // res is expected to be a string
+                return Either.left(node.at(pointerRes).asText());
+              }
+
+            } catch (Exception e) {
+              e.printStackTrace();
+              return Either.left(e.getMessage());
+            }
+
+          });
+    }
+  }
+
+  private static Either<String, Comment> handleCommentCommand(List<String> tokens, BufferedInputStream input,
+      PrintWriter output) {
+    if (tokens.size() != 3) {
+      return Either.left("Invalid use of command comment.\nUse: comment <idPost> <comment>");
+    } else {
+
+      var headers = new HashMap<String, String>();
+      headers.put("Content-Length", "0");
+      headers.put("Authorization", "Bearer " + JWT);
+
+      // 1 - get post's author
+      return HttpRequest
+          .buildGetRequest("/posts" + "/" + tokens.get(1) + "?author=true", headers)
+          .flatMap(r -> doRequest(r, input, output))
+          .flatMap(res -> {
+            var body = res.getBody();
+
+            try {
+
+              var node = objectMapper.readTree(body);
+              var pointerRes = JsonPointer.compile("/res");
+              var pointerOk = JsonPointer.compile("/ok");
+
+              var isOk = node.at(pointerOk).asBoolean();
+
+              if (isOk) {
+                // res is expected to be a string containing the author of the post
+                return Either.right(node.at(pointerRes).asText());
+              } else {
+                // res is expected to be a string
+                return Either.left(node.at(pointerRes).asText());
+              }
+
+            } catch (Exception e) {
+              e.printStackTrace();
+              return Either.left(e.getMessage());
+            }
+
+          })
+          .flatMap(a -> {
+
+            // 2 - comment the post
+            var postUuid = tokens.get(1);
+            var comment = Comment.of(tokens.get(2), "", "").toJSON();
+
+            headers.put("Content-Length", comment.getBytes().length + "");
+            headers.put("Content-Type", HttpResponse.MIME_APPLICATION_JSON);
+
+            return HttpRequest
+                .buildPostRequest("/users" + "/" + a + "/posts" + "/" + postUuid + "/comments",
+                    comment,
+                    headers);
+          })
+          .flatMap(r -> doRequest(r, input, output))
+          .flatMap(res -> {
+            var body = res.getBody();
+
+            try {
+
+              var node = objectMapper.readTree(body);
+              var pointerRes = JsonPointer.compile("/res");
+              var pointerOk = JsonPointer.compile("/ok");
+
+              var isOk = node.at(pointerOk).asBoolean();
+
+              if (isOk) {
+                // res is expected to be a comment
+                return Either.right(
+                    objectMapper
+                        .convertValue(node.at(pointerRes), new TypeReference<Comment>() {
+                        }));
+              } else {
+                // res is expected to be a string
+                return Either.left(node.at(pointerRes).asText());
+              }
+
+            } catch (Exception e) {
+              e.printStackTrace();
+              return Either.left(e.getMessage());
+            }
+
+          });
     }
   }
 

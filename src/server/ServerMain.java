@@ -238,14 +238,6 @@ public class ServerMain {
 
   }
 
-  // private static void configureJExpressAuthMiddlewareUNSAFE(JExpress jexpress,
-  // Winsome winsome, String jwtSecret, String user) {
-  // jexpress.use((req, params, reply, next) -> {
-  // req.context = User.of(user, "", new LinkedList<>());
-  // next.run();
-  // });
-  // }
-
   private static void configureJExpressAuthMiddleware(JExpress jexpress, Winsome winsome, String jwtSecret) {
     jexpress.use((req, params, reply, next) -> {
 
@@ -903,7 +895,7 @@ public class ServerMain {
       reply.accept(toRet);
     });
 
-    // view a post
+    // view a post by author and its id
     jexpress.get(USERS_ROUTE + "/:user_id" + POSTS_ROUTE + "/:post_id", (req, params, reply) -> {
 
       var toRet = Either.<String, HttpResponse>right(null);
@@ -921,6 +913,46 @@ public class ServerMain {
                 Feedback.error(ToJSON.toJSON(err)).toJSON(),
                 HttpResponse.MIME_APPLICATION_JSON,
                 true));
+
+      } catch (Exception e) {
+        e.printStackTrace();
+        toRet = Either.left(e.getMessage());
+      }
+
+      reply.accept(toRet);
+    });
+
+    // view a post by its id
+    jexpress.get(POSTS_ROUTE + "/:post_id", (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+
+      try {
+        // authenticated user
+        var user = (User) req.context;
+
+        var authorQueryParam = req.getQueryParams().get("author");
+        var returnAuthorOnly = authorQueryParam != null && authorQueryParam.equals("true");
+
+        var temp = winsome
+            .getAuthorFromPostUuid(params.get("post_id"));
+
+        if (returnAuthorOnly) {
+          toRet = temp
+              .flatMap(a -> HttpResponse.build200(
+                  Feedback.right(ToJSON.toJSON(a)).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON, true));
+        } else {
+          toRet = temp.flatMap(a -> winsome.showPost(user.username, a, params.get("post_id")))
+              .flatMap(p -> HttpResponse.build200(
+                  Feedback.right(p.toJSON()).toJSON(),
+                  HttpResponse.MIME_APPLICATION_JSON, true));
+        }
+
+        toRet = toRet.recoverWith(err -> HttpResponse.build400(
+            Feedback.error(ToJSON.toJSON(err)).toJSON(),
+            HttpResponse.MIME_APPLICATION_JSON,
+            true));
 
       } catch (Exception e) {
         e.printStackTrace();

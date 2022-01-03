@@ -10,7 +10,16 @@ public class WalletTransaction {
     var instance = new WalletTransaction();
 
     instance.timestamp = new Date().getTime(); // readonly
-    instance.gain = gain;
+    instance.gain = gain; // readonly
+
+    return instance;
+  }
+
+  public static WalletTransaction clone(WalletTransaction t) {
+    var instance = new WalletTransaction();
+
+    instance.timestamp = t.timestamp; // readonly
+    instance.gain = t.gain; // readonly
 
     return instance;
   }

@@ -10,6 +10,7 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -28,6 +29,7 @@ import domain.post.Post;
 import domain.reaction.Reaction;
 import domain.user.User;
 import domain.user.UserTags;
+import domain.wallet.WalletTransaction;
 import http.HttpRequest;
 import http.HttpResponse;
 import io.vavr.control.Either;
@@ -377,6 +379,26 @@ public class ClientMain {
             // wallet /btc
             //
             // show my own wallet
+            var eres = checkUserIsLogged()
+                .flatMap(__ -> handleWalletCommand(tokens, input, output));
+
+            if (eres.isLeft()) {
+              System.out.println(eres.getLeft());
+            } else {
+              var pair = eres.get();
+
+              var currency = tokens.size() == 2 ? "BTC" : "WC";
+
+              String leftAlignFormat = "| %-30s | %-22.20f " + currency + "%n";
+              String leftAlignFormatHeaders = "| %-30s | %-20s %n";
+              System.out.format(leftAlignFormatHeaders, "Date", "Gain");
+
+              pair.snd()
+                  .stream()
+                  .forEach(t -> System.out.format(leftAlignFormat, new Date(t.timestamp).toString(), t.gain));
+
+              System.out.printf("Total: %22.20f %s\n", pair.fst(), currency);
+            }
             break;
           }
           case "whoami": {
@@ -1160,6 +1182,59 @@ public class ClientMain {
       });
 
       return resp;
+    }
+
+  }
+
+  private static Either<String, Pair<Double, List<WalletTransaction>>> handleWalletCommand(List<String> tokens,
+      BufferedInputStream input,
+      PrintWriter output) {
+
+    if ((tokens.size() != 1 && tokens.size() != 2) || (tokens.size() == 2 && !tokens.get(1).equals("btc"))) {
+      return Either.left("Invalid use of command wallet.\nUse: wallet || wallet btc");
+    } else {
+
+      var useBTC = tokens.size() == 2;
+      var currency = useBTC ? "currency=bitcoin" : "currency=wincoin";
+
+      var headers = new HashMap<String, String>();
+      headers.put("Content-Length", "0");
+      headers.put("Authorization", "Bearer " + JWT);
+
+      var erequest = HttpRequest.buildGetRequest("/users" + "/" + username + "/wallet" + "?" + currency, headers);
+
+      var result = erequest.flatMap(r -> doRequest(r, input, output));
+
+      return result.flatMap(res -> {
+        // extract data from JSON
+        var body = res.getBody();
+
+        try {
+          var node = objectMapper.readTree(body);
+          var pointerRes = JsonPointer.compile("/res");
+          var pointerResHistory = JsonPointer.compile("/res/history");
+          var pointerResTotal = JsonPointer.compile("/res/total");
+          var pointerOk = JsonPointer.compile("/ok");
+
+          var isOk = node.at(pointerOk).asBoolean();
+          if (isOk) {
+            // res is expected to be an object { history: Transaction[], total }
+            return Either.right(
+                Pair.of(
+                    node.at(pointerResTotal).asDouble(),
+                    objectMapper
+                        .convertValue(node.at(pointerResHistory), new TypeReference<List<WalletTransaction>>() {
+                        })));
+          } else {
+            return Either.left(node.at(pointerRes).asText());
+          }
+
+        } catch (Exception e) {
+          e.printStackTrace();
+          return Either.left(e.getMessage());
+        }
+      });
+
     }
 
   }

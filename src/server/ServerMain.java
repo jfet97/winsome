@@ -755,6 +755,7 @@ public class ServerMain {
 
           var ess = Either.<String, String>right(null);
           var total = Wrapper.of("");
+          var rate = Wrapper.of(0.);
 
           if (useWincoins) {
             total.value = winsome
@@ -762,14 +763,31 @@ public class ServerMain {
                 .map(ws -> ToJSON.toJSON(ws))
                 .fold(__ -> "", ws -> ws);
           } else if (useBitcoins) {
-            total.value = winsome
-                .getUserWalletInBitcoin(user.username)
-                .map(bs -> ToJSON.toJSON(bs))
-                .fold(__ -> "", bs -> bs);
+            var epair = winsome
+                .getUserWalletInBitcoin(user.username);
+
+            total.value = epair
+                .map(p -> p.snd())
+                .map(ws -> ToJSON.toJSON(ws))
+                .fold(__ -> "", ws -> ws);
+
+            rate.value = epair
+                .map(p -> p.fst())
+                .fold(__ -> 0., r -> r);
           }
 
           ess = winsome.getUserWallet(user.username)
-              .map(ws -> ws.stream().map(w -> w.toJSON()).collect(Collectors.toList()))
+              .map(ws -> ws
+                  .stream()
+                  .map(w -> {
+                    if (useBitcoins) {
+                      // convert each gain in bitwalletcoin
+                      w.gain = rate.value * w.gain;
+                    }
+                    return w;
+                  })
+                  .map(w -> w.toJSON())
+                  .collect(Collectors.toList()))
               .map(ws -> {
                 var toRetI = "{";
 

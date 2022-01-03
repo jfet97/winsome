@@ -26,10 +26,6 @@ public class ToJSON {
     return n + "";
   }
 
-  public static <A,B> String toJSON(Pair<A, B> b) {
-    return b + "";
-  }
-
   // from a collection of valid JSON strings
   // to a valid JSON array containing the elements of the collection
   public static String sequence(Collection<String> collection) {

@@ -108,7 +108,12 @@ public class Winsome {
   private Either<String, List<WalletTransaction>> getWalletOfUser(String username) {
     return nullGuard(username, "username")
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
-        .map(u -> this.wallet.getWallet().get(u.username).stream().collect(Collectors.toList()));
+        .map(u -> this.wallet
+        .getWallet()
+        .get(u.username)
+        .stream()
+        .map(WalletTransaction::clone)
+        .collect(Collectors.toList()));
   }
 
   private Either<String, Post> cancelPost(String username, String postUuid) {
@@ -553,7 +558,7 @@ public class Winsome {
         .map(ts -> ts.stream().map(t -> t.gain).reduce(0., (acc, val) -> acc + val));
   }
 
-  public Either<String, Double> getUserWalletInBitcoin(String username) {
+  public Either<String, Pair<Double, Double>> getUserWalletInBitcoin(String username) {
     return getUserWalletInWincoin(username)
         .flatMap(ws -> {
 
@@ -574,7 +579,9 @@ public class Winsome {
               }
               reader.close();
 
-              return Either.right(Double.parseDouble(res.toString()) * ws);
+              var rate = Double.parseDouble(res.toString());
+
+              return Either.right(Pair.of(rate, rate * ws));
             } else {
               throw new RuntimeException("get request to random.org has failed");
             }

@@ -6,6 +6,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -30,6 +31,7 @@ public class Post {
 
   // to store unknown properties
   public Map<String, Object> unknowns = new HashMap<>();
+
   @JsonAnySetter
   void setDetail(String key, Object value) {
     unknowns.put(key, value);
@@ -68,6 +70,18 @@ public class Post {
           .stream()
           .filter(r -> !r.isUpvote)
           .count();
+    }
+  }
+
+  public List<Reaction> getReactions() {
+    synchronized (reactions) {
+      return this.reactions.stream().collect(Collectors.toList());
+    }
+  }
+
+  public List<Comment> getComments() {
+    synchronized (comments) {
+      return this.comments.stream().collect(Collectors.toList());
     }
   }
 

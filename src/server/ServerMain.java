@@ -118,6 +118,9 @@ public class ServerMain {
     serverThread.start();
     walletThread.start();
     persistenceThread.start();
+
+    System.out.println("Server has started");
+
     try {
       serverThread.join();
     } catch (InterruptedException e) {

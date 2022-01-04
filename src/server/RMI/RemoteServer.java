@@ -59,6 +59,7 @@ public class RemoteServer extends RemoteObject implements IRemoteServer {
               rc.deleteFollower(performer);
           } catch (RemoteException e) {
             e.printStackTrace();
+            return null;
           }
           return rc;
         });

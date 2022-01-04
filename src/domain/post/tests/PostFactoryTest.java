@@ -62,7 +62,7 @@ public class PostFactoryTest {
   void threeErrors() {
     var epost = PostFactory.create(null, null, null);
     assertEquals(epost.isValid(), false);
-    assertEquals(epost.fold(set -> set.foldLeft(0, (tot, curr) -> tot + 1), post -> 0), 3);
+    assertEquals((Integer) epost.fold(set -> set.foldLeft(0, (tot, curr) -> tot + 1), post -> 0), 3);
 
     var errors = epost.getError();
     assertTrue(errors.asJava().contains("title cannot be null"));

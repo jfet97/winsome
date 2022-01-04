@@ -5,3 +5,4 @@ bin
 *.mp4
 **/*.txt
 .VSCodeCounter
+build

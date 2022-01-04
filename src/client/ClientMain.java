@@ -151,7 +151,7 @@ public class ClientMain {
         remoteServer.value.registerFollowersCallback(stub.value);
 
         // get multicast details
-        multicastThread = new Thread(configureMulticast(input, output)
+        multicastThread = new Thread((Runnable) configureMulticast(input, output)
             .fold(e -> () -> System.out.println(e), r -> r));
 
         // start the multicast thread
@@ -365,7 +365,7 @@ public class ClientMain {
             // register a new user to winsome
 
             System.out.println(
-                checkUserIsNotLogged()
+                (String) checkUserIsNotLogged()
                     .flatMap(__ -> handleRegisterCommandRMI(tokens, input, output, remoteServer.value))
                     .fold(s -> s, s -> s));
 
@@ -440,7 +440,7 @@ public class ClientMain {
             // follow an user
 
             System.out.println(
-                checkUserIsLogged()
+                (String) checkUserIsLogged()
                     .flatMap(__ -> handleFollowCommand(tokens, input, output))
                     .fold(s -> s, s -> s));
 
@@ -452,7 +452,7 @@ public class ClientMain {
             // unfollow an user
 
             System.out.println(
-                checkUserIsLogged()
+                (String) checkUserIsLogged()
                     .flatMap(__ -> handleUnfollowCommand(tokens, input, output))
                     .fold(s -> s, s -> s));
             break;
@@ -485,7 +485,7 @@ public class ClientMain {
             // create a new post in my blog
 
             System.out.println(
-                checkUserIsLogged()
+                (String) checkUserIsLogged()
                     .flatMap(__ -> handlePostCommand(tokens, input, output))
                     .fold(s -> s, title -> "new post created: " + title));
             break;
@@ -542,7 +542,7 @@ public class ClientMain {
             // delete a post
 
             System.out.println(
-                checkUserIsLogged()
+                (String) checkUserIsLogged()
                     .flatMap(__ -> handleDeleteCommand(tokens, input, output))
                     .fold(s -> s, uuid -> "deleted post: " + uuid));
             break;
@@ -553,7 +553,7 @@ public class ClientMain {
             // rewin a post
 
             System.out.println(
-                checkUserIsLogged()
+                (String) checkUserIsLogged()
                     .flatMap(__ -> handleRewinCommand(tokens, input, output))
                     .fold(s -> s, title -> "post rewined: " + title));
             break;
@@ -620,7 +620,7 @@ public class ClientMain {
             // whoami
 
             System.out.println(
-                checkUserIsLogged()
+                (String) checkUserIsLogged()
                     .map(__ -> username)
                     .fold(s -> s, s -> s));
             break;

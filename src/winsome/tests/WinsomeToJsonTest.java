@@ -21,6 +21,7 @@ import domain.user.User;
 import domain.wallet.Wallet;
 import winsome.Winsome;
 
+@SuppressWarnings("unchecked")
 public class WinsomeToJsonTest {
   @Test
   public void fromtoJSONSingleThread()

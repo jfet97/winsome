@@ -42,6 +42,7 @@ import domain.reaction.Reaction;
 import domain.user.User;
 import domain.user.UserTags;
 import domain.wallet.WalletTransaction;
+import http.HttpConstants;
 import http.HttpRequest;
 import http.HttpResponse;
 import io.vavr.control.Either;
@@ -649,7 +650,7 @@ public class ClientMain {
 
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", newUserJSONLength + "");
-      headers.put("Content-Type", HttpResponse.MIME_APPLICATION_JSON);
+      headers.put("Content-Type", HttpConstants.MIME_APPLICATION_JSON);
       headers.put("Authorization", "Bearer " + JWT);
 
       var erequest = HttpRequest.buildPostRequest("/users" + "/" + username + "/following", newUserJSON, headers);
@@ -687,7 +688,7 @@ public class ClientMain {
 
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", newUserJSONLength + "");
-      headers.put("Content-Type", HttpResponse.MIME_APPLICATION_JSON);
+      headers.put("Content-Type", HttpConstants.MIME_APPLICATION_JSON);
       headers.put("Authorization", "Bearer " + JWT);
 
       var erequest = HttpRequest.buildDeleteRequest("/users" + "/" + username + "/following", newUserJSON, headers);
@@ -747,7 +748,7 @@ public class ClientMain {
 
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", newUserJSONLength + "");
-      headers.put("Content-Type", HttpResponse.MIME_APPLICATION_JSON);
+      headers.put("Content-Type", HttpConstants.MIME_APPLICATION_JSON);
 
       var erequest = HttpRequest.buildPostRequest("/users", newUserJSON, headers);
 
@@ -789,7 +790,7 @@ public class ClientMain {
 
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", usernamePasswordJSONLength + "");
-      headers.put("Content-Type", HttpResponse.MIME_APPLICATION_JSON);
+      headers.put("Content-Type", HttpConstants.MIME_APPLICATION_JSON);
 
       var erequest = HttpRequest.buildPostRequest(
           "/login" + (isForced ? "?force=true" : ""),
@@ -1246,7 +1247,7 @@ public class ClientMain {
             var reaction = Reaction.of(isUpvote, "", "").toJSON();
 
             headers.put("Content-Length", reaction.getBytes().length + "");
-            headers.put("Content-Type", HttpResponse.MIME_APPLICATION_JSON);
+            headers.put("Content-Type", HttpConstants.MIME_APPLICATION_JSON);
 
             return HttpRequest
                 .buildPostRequest("/users" + "/" + a + "/posts" + "/" + tokens.get(1) + "/reactions",
@@ -1331,7 +1332,7 @@ public class ClientMain {
             var comment = Comment.of(tokens.get(2), "", "").toJSON();
 
             headers.put("Content-Length", comment.getBytes().length + "");
-            headers.put("Content-Type", HttpResponse.MIME_APPLICATION_JSON);
+            headers.put("Content-Type", HttpConstants.MIME_APPLICATION_JSON);
 
             return HttpRequest
                 .buildPostRequest("/users" + "/" + a + "/posts" + "/" + postUuid + "/comments",

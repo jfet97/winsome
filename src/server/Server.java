@@ -11,6 +11,7 @@ import java.util.concurrent.CompletableFuture;
 
 import domain.constant.Constant;
 import domain.feedback.Feedback;
+import http.HttpConstants;
 import http.HttpRequest;
 import http.HttpResponse;
 import io.vavr.control.Either;
@@ -33,16 +34,16 @@ public class Server implements Runnable {
   }
 
   public HttpResponse badRequestCloseConnection(String error) {
-    return HttpResponse.build400(Feedback.error(error).toJSON(), HttpResponse.MIME_APPLICATION_JSON, false).get();
+    return HttpResponse.build400(Feedback.error(error).toJSON(), HttpConstants.MIME_APPLICATION_JSON, false).get();
   }
 
   public HttpResponse internalServerErrorCloseConnection() {
     return HttpResponse.build500(Feedback.error(
-        "INTERNAL SERVER ERROR").toJSON(), HttpResponse.MIME_APPLICATION_JSON, false).get();
+        "INTERNAL SERVER ERROR").toJSON(), HttpConstants.MIME_APPLICATION_JSON, false).get();
   }
 
   public HttpResponse okKeepAliveConnection(String message) {
-    return HttpResponse.build200(Feedback.error(message).toJSON(), HttpResponse.MIME_APPLICATION_JSON, true).get();
+    return HttpResponse.build200(Feedback.error(message).toJSON(), HttpConstants.MIME_APPLICATION_JSON, true).get();
   }
 
   public void handleAccept(ServerSocketChannel serverChannel, Selector selector) throws IOException {
@@ -110,7 +111,8 @@ public class Server implements Runnable {
         var req = ereq.get();
 
         var method = req.getMethod();
-        var noCLRequired = method.equals("GET") || method.equals("DELETE") || method.equals("OPTIONS");
+        var noCLRequired = method.equals(HttpConstants.GET) || method.equals(HttpConstants.DELETE)
+            || method.equals(HttpConstants.OPTIONS);
         var contentLengthHeader = req.getHeaders().get("Content-Length");
         var isThereContentLengthHeader = contentLengthHeader != null;
 

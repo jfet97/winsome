@@ -31,6 +31,7 @@ import domain.user.User;
 import domain.user.UserFactory;
 import domain.wallet.Wallet;
 import domain.wallet.WalletTransaction;
+import http.HttpConstants;
 import io.vavr.control.Either;
 import utils.HashPassword;
 import utils.Pair;
@@ -279,6 +280,7 @@ public class Winsome {
 
   // login a user if the arguments and the internal jwt secret are valid
   // or an error in the form of a string if not
+  // return the created jwt
   public Either<String, String> login(String username, String password, Boolean forceLogin) {
     return nullGuard(username, "username")
         .flatMap(__ -> nullGuard(password, "password"))
@@ -722,7 +724,7 @@ public class Winsome {
   }
 
   // return the wallet of a user, adding together the transactions using bitcoin
-  // as currency
+  // as currency, plus the used rate
   // or an error in the form of a string if the argument is not valid
   public Either<String, Pair<Double, Double>> getUserWalletInBitcoin(String username) {
     return getUserWalletInWincoin(username)
@@ -732,7 +734,7 @@ public class Winsome {
           try {
             var url = new URL("https://www.random.org/decimal-fractions/?num=1&dec=10&col=1&format=plain&rnd=new");
             var con = (HttpURLConnection) url.openConnection();
-            con.setRequestMethod("GET");
+            con.setRequestMethod(HttpConstants.GET);
 
             if (con.getResponseCode() == HttpURLConnection.HTTP_OK) {
               var reader = new BufferedReader(new InputStreamReader(con.getInputStream()));
@@ -869,7 +871,7 @@ public class Winsome {
                   // sum the values of all the comments and computes their contribute
                   var commentsSum = comments
                       .stream()
-                      .map(ce -> 1.)
+                      .map(ce -> (double) ce.getValue().size())
                       .reduce(0., (acc, val) -> acc + (2. / (1 + Math.pow(Math.E, -(val.intValue() - 1)))));
 
                   var commentsContribute = Math.log(commentsSum + 1);

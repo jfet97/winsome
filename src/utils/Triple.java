@@ -1,5 +1,6 @@
 package utils;
 
+// a generic triple
 public class Triple<A, B, C> {
 
   private final A fst;

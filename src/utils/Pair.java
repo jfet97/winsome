@@ -1,5 +1,6 @@
 package utils;
 
+// a generic pair
 public class Pair<F, S> {
 
   private final F fst;

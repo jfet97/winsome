@@ -18,24 +18,6 @@ public class HttpResponse {
   private HttpResponse() {
   }
 
-  public static final String HTTPV11 = "HTTP/1.1";
-  public static final String HTTPV20 = "HTTP/2.0";
-  public static final String CRLF = "\r\n";
-
-  public static final String[] OK_200 = { "200", "OK" };
-  public static final String[] CREATED_201 = { "201", "Created" };
-  public static final String[] CREATED_204 = { "204", "No Content" };
-  public static final String[] BAD_REQUEST_400 = { "400", "Bad Request" };
-  public static final String[] UNAUTHORIZED_401 = { "401", "Unauthorized" };
-  public static final String[] FORBIDDEN_403 = { "403", "Forbidden" };
-  public static final String[] NOT_FOUND_404 = { "404", "Not Found" };
-  public static final String[] METHOD_NOT_ALLOWED_405 = { "405", "Method Not Allowed" };
-  public static final String[] INTERNAL_SERVER_ERROR_500 = { "500", "Internal Server Error" };
-
-  public static final String MIME_APPLICATION_JSON = "application/json";
-  public static final String MIME_TEXT_PLAIN = "text/plain";
-  public static final String MIME_TEXT_HTML = "text/html";
-
   public static Either<String, HttpResponse> build(String HTTPVersion, String statusCode, String reasonPhrase) {
     HttpResponse instance = new HttpResponse();
     var errorMessage = "";
@@ -68,8 +50,8 @@ public class HttpResponse {
     } else {
       try {
 
-        var responseAndBody = response.split(CRLF + CRLF);
-        var responseBeforeBodyEntries = responseAndBody[0].split(CRLF);
+        var responseAndBody = response.split(HttpConstants.CRLF + HttpConstants.CRLF);
+        var responseBeforeBodyEntries = responseAndBody[0].split(HttpConstants.CRLF);
 
         // parse response line
         var responseLineEntries = responseBeforeBodyEntries[0].split(" ");
@@ -143,13 +125,13 @@ public class HttpResponse {
   @Override
   public String toString() {
 
-    var response = this.HTTPVersion + " " + this.statusCode + " " + this.reasonPhrase + CRLF;
+    var response = this.HTTPVersion + " " + this.statusCode + " " + this.reasonPhrase + HttpConstants.CRLF;
 
     for (var entry : this.headers.entrySet()) {
-      response += entry.getKey() + ": " + entry.getValue() + CRLF;
+      response += entry.getKey() + ": " + entry.getValue() + HttpConstants.CRLF;
     }
 
-    response += CRLF;
+    response += HttpConstants.CRLF;
 
     response += this.body;
 
@@ -183,50 +165,51 @@ public class HttpResponse {
     String body = bodyN != null ? bodyN : "";
     String bodyLength = body.getBytes().length + "";
 
-    return HttpResponse.build(HttpResponse.HTTPV11, code[0], code[1])
+    return HttpResponse.build(HttpConstants.HTTPV11, code[0], code[1])
         .flatMap(r -> r.setHeader("Connection", keepAliveConnection ? "keep-alive" : "close"))
         .flatMap(r -> r.setHeader("Content-Length", bodyLength))
         .flatMap(r -> mime != null ? r.setHeader("Content-Type", mime) : Either.right(r))
+        .flatMap(r -> r.setHeader("Access-Control-Allow-Origin", "*")) // temp hotfix because of CORS
+        .flatMap(r -> r.setHeader("Access-Control-Allow-Methods", "*")) // temp hotfix because of CORS
+        .flatMap(r -> r.setHeader("Access-Control-Allow-Headers", "*")) // temp hotfix because of CORS
+        .flatMap(r -> r.setHeader("Access-Control-Allow-Credentials", "true")) // temp hotfix because of CORS
         .flatMap(r -> r.setBody(body));
   }
 
   public static Either<String, HttpResponse> build200(String bodyN, String mime, Boolean keepAliveConnection) {
-    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.OK_200)
-        .flatMap(r -> r.setHeader("Access-Control-Allow-Origin", "*")); // temp bugfix because of cors
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpConstants.OK_200);
   }
 
   public static Either<String, HttpResponse> build201(String bodyN, String mime, Boolean keepAliveConnection) {
-    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.CREATED_201)
-        .flatMap(r -> r.setHeader("Access-Control-Allow-Origin", "*")); // temp bugfix because of cors
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpConstants.CREATED_201);
   }
 
   public static Either<String, HttpResponse> build204(String bodyN, String mime, Boolean keepAliveConnection) {
-    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.CREATED_204)
-        .flatMap(r -> r.setHeader("Access-Control-Allow-Origin", "*")); // temp bugfix because of cors
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpConstants.CREATED_204);
   }
 
   public static Either<String, HttpResponse> build400(String bodyN, String mime, Boolean keepAliveConnection) {
-    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.BAD_REQUEST_400)
-        .flatMap(r -> r.setHeader("Access-Control-Allow-Origin", "*")); // temp bugfix because of cors
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpConstants.BAD_REQUEST_400);
+
   }
 
   public static Either<String, HttpResponse> build401(String bodyN, String mime, Boolean keepAliveConnection) {
-    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.UNAUTHORIZED_401);
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpConstants.UNAUTHORIZED_401);
   }
 
   public static Either<String, HttpResponse> build403(String bodyN, String mime, Boolean keepAliveConnection) {
-    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.FORBIDDEN_403);
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpConstants.FORBIDDEN_403);
   }
 
   public static Either<String, HttpResponse> build404(String bodyN, String mime, Boolean keepAliveConnection) {
-    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.NOT_FOUND_404);
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpConstants.NOT_FOUND_404);
   }
 
   public static Either<String, HttpResponse> build405(String bodyN, String mime, Boolean keepAliveConnection) {
-    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.METHOD_NOT_ALLOWED_405);
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpConstants.METHOD_NOT_ALLOWED_405);
   }
 
   public static Either<String, HttpResponse> build500(String bodyN, String mime, Boolean keepAliveConnection) {
-    return buildFromCode(bodyN, mime, keepAliveConnection, HttpResponse.INTERNAL_SERVER_ERROR_500);
+    return buildFromCode(bodyN, mime, keepAliveConnection, HttpConstants.INTERNAL_SERVER_ERROR_500);
   }
 }

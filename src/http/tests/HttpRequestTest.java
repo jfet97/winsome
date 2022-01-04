@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import http.HttpConstants;
 import http.HttpRequest;
 
 public class HttpRequestTest {
@@ -53,9 +54,9 @@ public class HttpRequestTest {
 
   @Test
   void buildValidGET() {
-    var erequest = HttpRequest.build("GET")
+    var erequest = HttpRequest.build(HttpConstants.GET)
         .flatMap(req -> req.setRequestTarget("/test/index.html"))
-        .flatMap(req -> req.setHTTPVersion(HttpRequest.HTTPV11))
+        .flatMap(req -> req.setHTTPVersion(HttpConstants.HTTPV11))
         .flatMap(req -> req.setHeader("User-Agent", "Mozilla/4.0(compatible; MSIE5.01; Windows NT)"))
         .flatMap(req -> req.setHeader("Host", "www.tutorialspoint.com"))
         .flatMap(req -> req.setHeader("Accept-Language", "en-us"))
@@ -71,14 +72,14 @@ public class HttpRequestTest {
 
   @Test
   void buildValidPOST() {
-    var erequest = HttpRequest.build("POST")
+    var erequest = HttpRequest.build(HttpConstants.POST)
         .flatMap(req -> req.setRequestTarget("/test/index.html"))
-        .flatMap(req -> req.setHTTPVersion(HttpRequest.HTTPV11))
+        .flatMap(req -> req.setHTTPVersion(HttpConstants.HTTPV11))
         .flatMap(req -> req.setHeader("User-Agent", "Mozilla/4.0(compatible; MSIE5.01; Windows NT)"))
         .flatMap(req -> req.setHeader("Host", "www.tutorialspoint.com"))
         .flatMap(req -> req.setHeader("Accept-Language", "en-us"))
         .flatMap(req -> req.setHeader("Accept-Encoding", "gzip, deflate"))
-        .flatMap(req -> req.setHeader("Content-Type", "application/json"))
+        .flatMap(req -> req.setHeader("Content-Type", HttpConstants.MIME_APPLICATION_JSON))
         .flatMap(req -> req.setHeader("Content-Length", "46"))
         .flatMap(req -> req.setHeader("Connection", "Keep-Alive"))
         .flatMap(req -> req.setBody("{\"field\":\"property\",\"array\":[1,2,{\"three\":3}]}"));

@@ -5,7 +5,6 @@ import java.rmi.RemoteException;
 import java.util.List;
 
 import client.RMI.IRemoteClient;
-import domain.user.User;
 import io.vavr.control.Either;
 
 public interface IRemoteServer extends Remote {

@@ -7,6 +7,7 @@ public class HashPassword {
   private HashPassword() {
   }
 
+  // hash a password using SHA-512
   public static String hash(String password) {
     try {
 

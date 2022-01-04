@@ -15,6 +15,7 @@ import com.auth0.jwt.exceptions.JWTVerificationException;
 import org.junit.jupiter.api.Test;
 
 import domain.user.User;
+import http.HttpConstants;
 import http.HttpRequest;
 import http.HttpResponse;
 import jexpress.JExpress;
@@ -37,7 +38,7 @@ public class JExpressTest {
       usersCalled.value = true;
       usersIdCalled.value = false;
 
-      var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.OK_200[0], HttpResponse.OK_200[1])
+      var response = HttpResponse.build(HttpConstants.HTTPV11, HttpConstants.OK_200[0], HttpConstants.OK_200[1])
           .flatMap(req -> req.setHeader("Server", "nginx/0.8.54"))
           .flatMap(req -> req.setHeader("Date", "02 Jan 2012 02:33:17 GMT"))
           .flatMap(req -> req.setHeader("Content-Type", "text/html"))
@@ -55,7 +56,7 @@ public class JExpressTest {
       usersCalled.value = false;
       usersIdCalled.value = true;
 
-      var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.OK_200[0], HttpResponse.OK_200[1])
+      var response = HttpResponse.build(HttpConstants.HTTPV11, HttpConstants.OK_200[0], HttpConstants.OK_200[1])
           .flatMap(req -> req.setHeader("Server", "nginx/0.8.54"))
           .flatMap(req -> req.setHeader("Date", "02 Jan 2012 02:33:17 GMT"))
           .flatMap(req -> req.setHeader("Content-Type", "text/html"))
@@ -68,9 +69,9 @@ public class JExpressTest {
       usersIdResponse.value = response.toString();
     });
 
-    var usersRequest = HttpRequest.build("POST")
+    var usersRequest = HttpRequest.build(HttpConstants.POST)
         .flatMap(req -> req.setRequestTarget("/users"))
-        .flatMap(req -> req.setHTTPVersion(HttpRequest.HTTPV11))
+        .flatMap(req -> req.setHTTPVersion(HttpConstants.HTTPV11))
         .flatMap(req -> req.setBody("Random Body"))
         .get();
 
@@ -79,9 +80,9 @@ public class JExpressTest {
     assertTrue(usersCalled.value);
     assertFalse(usersIdCalled.value);
 
-    var usersIdRequest = HttpRequest.build("POST")
+    var usersIdRequest = HttpRequest.build(HttpConstants.POST)
         .flatMap(req -> req.setRequestTarget("/users/123456"))
-        .flatMap(req -> req.setHTTPVersion(HttpRequest.HTTPV11))
+        .flatMap(req -> req.setHTTPVersion(HttpConstants.HTTPV11))
         .flatMap(req -> req.setBody("Random Body"))
         .get();
 
@@ -108,9 +109,9 @@ public class JExpressTest {
 
     var failedAuthResponseSent = Wrapper.of(false);
 
-    var usersRequest = HttpRequest.build("GET")
+    var usersRequest = HttpRequest.build(HttpConstants.GET)
         .flatMap(req -> req.setRequestTarget("/users"))
-        .flatMap(req -> req.setHTTPVersion(HttpRequest.HTTPV11))
+        .flatMap(req -> req.setHTTPVersion(HttpConstants.HTTPV11))
         .get();
 
     var algorithm = Algorithm.HMAC256("ABCDE");
@@ -124,15 +125,15 @@ public class JExpressTest {
         .withClaim("username", "meulno")
         .sign(algorithm);
 
-    var usersIdRequest = HttpRequest.build("GET")
+    var usersIdRequest = HttpRequest.build(HttpConstants.GET)
         .flatMap(req -> req.setRequestTarget("/users/123456"))
         .flatMap(req -> req.setHeader("Authorization", "Bearer " + jwt))
-        .flatMap(req -> req.setHTTPVersion(HttpRequest.HTTPV11))
+        .flatMap(req -> req.setHTTPVersion(HttpConstants.HTTPV11))
         .get();
 
     jexpress.get("/users", (request, params, reply) -> {
 
-      var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.OK_200[0], HttpResponse.OK_200[1])
+      var response = HttpResponse.build(HttpConstants.HTTPV11, HttpConstants.OK_200[0], HttpConstants.OK_200[1])
           .flatMap(req -> req.setHeader("Server", "nginx/0.8.54"))
           .flatMap(req -> req.setHeader("Date", "02 Jan 2012 02:33:17 GMT"))
           .flatMap(req -> req.setHeader("Content-Type", "text/html"))
@@ -148,7 +149,7 @@ public class JExpressTest {
 
     jexpress.get("/users/:id", (request, params, reply) -> {
 
-      var response = HttpResponse.build(HttpResponse.HTTPV11, HttpResponse.OK_200[0], HttpResponse.OK_200[1])
+      var response = HttpResponse.build(HttpConstants.HTTPV11, HttpConstants.OK_200[0], HttpConstants.OK_200[1])
           .flatMap(req -> req.setHeader("Server", "nginx/0.8.54"))
           .flatMap(req -> req.setHeader("Date", "02 Jan 2012 02:33:17 GMT"))
           .flatMap(req -> req.setHeader("Content-Type", "text/html"))
@@ -201,7 +202,7 @@ public class JExpressTest {
 
       if (error) {
         var response = HttpResponse
-            .build(HttpResponse.HTTPV11, HttpResponse.UNAUTHORIZED_401[0], HttpResponse.UNAUTHORIZED_401[1])
+            .build(HttpConstants.HTTPV11, HttpConstants.UNAUTHORIZED_401[0], HttpConstants.UNAUTHORIZED_401[1])
             .flatMap(req -> req.setHeader("Server", "nginx/0.8.54"))
             .flatMap(req -> req.setHeader("Date", "02 Jan 2012 02:33:17 GMT"))
             .flatMap(req -> req.setHeader("Content-Type", "text/html"))

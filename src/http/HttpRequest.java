@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+
 import io.vavr.control.Either;
 
 public class HttpRequest {
@@ -21,17 +22,6 @@ public class HttpRequest {
   private HttpRequest() {
   }
 
-  public static final String HTTPV11 = "HTTP/1.1";
-  public static final String HTTPV20 = "HTTP/2.0";
-  public static final String CRLF = "\r\n";
-
-  public static final String GET = "GET";
-  public static final String POST = "POST";
-  public static final String PUT = "PUT";
-  public static final String PATCH = "PATCH";
-  public static final String DELETE = "DELETE";
-  public static final String OPTIONS = "OPTIONS";
-
   public static Either<String, HttpRequest> build(String method) {
     HttpRequest instance = new HttpRequest();
     var errorMessage = "";
@@ -40,12 +30,12 @@ public class HttpRequest {
       errorMessage = "HTTP method cannot be null";
     } else {
       switch (method) {
-        case "GET":
-        case "POST":
-        case "PUT":
-        case "PATCH":
-        case "DELETE":
-        case "OPTIONS": {
+        case HttpConstants.GET:
+        case HttpConstants.POST:
+        case HttpConstants.PUT:
+        case HttpConstants.PATCH:
+        case HttpConstants.DELETE:
+        case HttpConstants.OPTIONS: {
           instance.method = method;
           break;
         }
@@ -72,8 +62,8 @@ public class HttpRequest {
     } else {
       try {
 
-        var requestAndBody = request.split(CRLF + CRLF);
-        var requestBeforeBodyEntries = requestAndBody[0].split(CRLF);
+        var requestAndBody = request.split(HttpConstants.CRLF + HttpConstants.CRLF);
+        var requestBeforeBodyEntries = requestAndBody[0].split(HttpConstants.CRLF);
 
         // parse request line
         var requestLineEntries = requestBeforeBodyEntries[0].split(" ");
@@ -82,12 +72,12 @@ public class HttpRequest {
         instance.HTTPVersion = requestLineEntries[2];
 
         switch (instance.method) {
-          case "GET":
-          case "POST":
-          case "PUT":
-          case "PATCH":
-          case "DELETE":
-          case "OPTIONS": {
+          case HttpConstants.GET:
+          case HttpConstants.POST:
+          case HttpConstants.PUT:
+          case HttpConstants.PATCH:
+          case HttpConstants.DELETE:
+          case HttpConstants.OPTIONS: {
             break;
           }
           default: {
@@ -203,12 +193,12 @@ public class HttpRequest {
     // to reject the request — while not prohibited by the specification, the
     // semantics are undefined. It is better to just avoid sending payloads in GET
     // requests.
-    if ((this.method.equals("GET") || this.method.equals("DELETE") || method.equals("OPTIONS"))
-        && !this.body.equals("")) {
+    if ((this.method.equals(HttpConstants.GET) || this.method.equals(HttpConstants.DELETE)
+        || method.equals(HttpConstants.OPTIONS)) && !this.body.equals("")) {
       isValid = false;
     }
 
-    if (!this.method.equals("GET") && this.body.equals("")) {
+    if (!this.method.equals(HttpConstants.GET) && this.body.equals("")) {
       isValid = false;
     }
 
@@ -218,13 +208,13 @@ public class HttpRequest {
   @Override
   public String toString() {
 
-    var request = this.method + " " + this.requestTarget + " " + this.HTTPVersion + CRLF;
+    var request = this.method + " " + this.requestTarget + " " + this.HTTPVersion + HttpConstants.CRLF;
 
     for (var entry : this.headers.entrySet()) {
-      request += entry.getKey() + ": " + entry.getValue() + CRLF;
+      request += entry.getKey() + ": " + entry.getValue() + HttpConstants.CRLF;
     }
 
-    request += CRLF;
+    request += HttpConstants.CRLF;
 
     request += this.body;
 
@@ -266,8 +256,8 @@ public class HttpRequest {
   public static Either<String, HttpRequest> buildPostRequest(String requestTarget, String body,
       Map<String, String> headers) {
 
-    return HttpRequest.build(HttpRequest.POST)
-        .flatMap(r -> r.setHTTPVersion(HTTPV11))
+    return HttpRequest.build(HttpConstants.POST)
+        .flatMap(r -> r.setHTTPVersion(HttpConstants.HTTPV11))
         .flatMap(r -> r.setRequestTarget(requestTarget))
         .flatMap(r -> {
           var toRet = Either.<String, HttpRequest>right(r);
@@ -283,8 +273,8 @@ public class HttpRequest {
 
   public static Either<String, HttpRequest> buildGetRequest(String requestTarget, Map<String, String> headers) {
 
-    return HttpRequest.build(HttpRequest.GET)
-        .flatMap(r -> r.setHTTPVersion(HTTPV11))
+    return HttpRequest.build(HttpConstants.GET)
+        .flatMap(r -> r.setHTTPVersion(HttpConstants.HTTPV11))
         .flatMap(r -> r.setRequestTarget(requestTarget))
         .flatMap(r -> {
           var toRet = Either.<String, HttpRequest>right(r);
@@ -300,8 +290,8 @@ public class HttpRequest {
   public static Either<String, HttpRequest> buildDeleteRequest(String requestTarget, String body,
       Map<String, String> headers) {
 
-    return HttpRequest.build(HttpRequest.DELETE)
-        .flatMap(r -> r.setHTTPVersion(HTTPV11))
+    return HttpRequest.build(HttpConstants.DELETE)
+        .flatMap(r -> r.setHTTPVersion(HttpConstants.HTTPV11))
         .flatMap(r -> r.setRequestTarget(requestTarget))
         .flatMap(r -> {
           var toRet = Either.<String, HttpRequest>right(r);

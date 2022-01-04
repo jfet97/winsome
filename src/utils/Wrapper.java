@@ -1,5 +1,6 @@
 package utils;
 
+// simple, generic wrapper
 public class Wrapper<T> {
   public T value;
 

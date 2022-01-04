@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import domain.feedback.Feedback;
+import http.HttpConstants;
 import http.HttpRequest;
 import http.HttpResponse;
 import io.vavr.control.Either;
@@ -18,12 +19,12 @@ import utils.ToJSON;
 
 public class JExpress {
 
-  private final String GET = "GET";
-  private final String POST = "POST";
-  private final String PUT = "PUT";
-  private final String PATCH = "PATCH";
-  private final String DELETE = "DELETE";
-  private final String OPTIONS = "OPTIONS";
+  private final String GET = HttpConstants.GET;
+  private final String POST = HttpConstants.POST;
+  private final String PUT = HttpConstants.PUT;
+  private final String PATCH = HttpConstants.PATCH;
+  private final String DELETE = HttpConstants.DELETE;
+  private final String OPTIONS = HttpConstants.OPTIONS;
 
   private final Map<String, Map<ExpressRoute, TriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>>>> routes = new HashMap<>();
   private final List<QuadriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>, Runnable>> globalMiddlewares = new LinkedList<>();
@@ -106,7 +107,7 @@ public class JExpress {
         var response = eresponse.recoverWith(err -> HttpResponse.build500(
             Feedback.error(
                 ToJSON.toJSON(err)).toJSON(),
-            HttpResponse.MIME_APPLICATION_JSON, true));
+            HttpConstants.MIME_APPLICATION_JSON, true));
 
         // set this response to be returned
         // (it will be returned unless a following middleware overwrites it)
@@ -116,7 +117,7 @@ public class JExpress {
     } catch (IndexOutOfBoundsException e) {
       // expect an IOOB exception when we run out of middlewares
       runRouteHandler.value = true;
-    } catch(Exception e) {
+    } catch (Exception e) {
       e.printStackTrace();
     }
 
@@ -160,7 +161,7 @@ public class JExpress {
                       .recoverWith(err -> HttpResponse.build500(
                           Feedback.error(
                               ToJSON.toJSON(err)).toJSON(),
-                          HttpResponse.MIME_APPLICATION_JSON, true));
+                          HttpConstants.MIME_APPLICATION_JSON, true));
 
                   resWrapper.value = response;
                 });
@@ -173,7 +174,7 @@ public class JExpress {
           var response = HttpResponse.build404(
               Feedback.error(
                   ToJSON.toJSON(method + " is not supported for route " + target)).toJSON(),
-              HttpResponse.MIME_APPLICATION_JSON, true);
+              HttpConstants.MIME_APPLICATION_JSON, true);
 
           resWrapper.value = response;
         }
@@ -184,7 +185,7 @@ public class JExpress {
         var response = HttpResponse.build404(
             Feedback.error(
                 ToJSON.toJSON(method + "is not supported")).toJSON(),
-            HttpResponse.MIME_APPLICATION_JSON, true);
+            HttpConstants.MIME_APPLICATION_JSON, true);
 
         resWrapper.value = response;
       }

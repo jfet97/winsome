@@ -41,7 +41,9 @@ public class WinsomeTest {
 
     var winsome = new Winsome();
 
-    var walletThread = new Thread(winsome.makeWalletRunnable(2000L, 70).get());
+    winsome.setJWTSecret("askjldfhaslkjdfhlkajsh");
+
+    var walletThread = new Thread(winsome.makeWalletRunnable(20000L, 70).get());
     var persistenceThread = new Thread(winsome.makePersistenceRunnable(500L,
         "/Volumes/PortableSSD/MacMini/UniPi/Reti/Winsome/src/winsome/tests/WinsomeTest.json", false).get());
 

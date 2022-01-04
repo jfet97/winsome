@@ -764,8 +764,7 @@ public class Winsome {
         .flatMap(__ -> nullGuard(path, "path"))
         .flatMap(__ -> nullGuard(minify, "minify"))
         .map(__ -> () -> {
-          var interrupted = false;
-          while (!interrupted) {
+          while (!Thread.currentThread().isInterrupted()) {
             try {
               // could be interrupted, the internal state is serialized
               // usign the json format
@@ -780,10 +779,11 @@ public class Winsome {
 
               Thread.sleep(interval);
             } catch (InterruptedException e) {
-              interrupted = true;
+              Thread.currentThread().interrupt();
 
               // does not matter if the file does not exist
               var tempSnapshot = new File(path + ".temp");
+
               tempSnapshot.delete();
             } catch (Exception e) {
               e.printStackTrace();
@@ -880,7 +880,8 @@ public class Winsome {
                   // compute the gain of the author
                   var authorGain = (gain / 100) * authorPercentage;
 
-                  // list of other users that have contributed to the post (contains no duplicates)
+                  // list of other users that have contributed to the post (contains no
+                  // duplicates)
                   var otherUsers = Stream.concat(
                       positiveReactions
                           .stream()
@@ -925,6 +926,8 @@ public class Winsome {
               }
 
               Thread.sleep(interval);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
             } catch (Exception e) {
               e.printStackTrace();
             }

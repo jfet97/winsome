@@ -13,6 +13,7 @@ import java.net.NetworkInterface;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
@@ -58,7 +59,7 @@ public class ClientMain {
 
   // auth token
   private static String JWT = "";
-  // current username
+  // current user's username
   private static String username = "";
 
   // utils
@@ -82,18 +83,8 @@ public class ClientMain {
     // jackson main instance
     objectMapper = new ObjectMapper();
 
-    // configs
-    var config = (ClientConfig) null;
-
-    try {
-      config = objectMapper.readValue(new File(args[0]), ClientConfig.class);
-
-      if (!config.isValid()) {
-        throw new RuntimeException("invalid configuration");
-      }
-    } catch (Exception e) {
-      throw new RuntimeException("cannot parse server configuration file: " + e.getMessage());
-    }
+    // read configs
+    var config = readConfigFromFile(args);
 
     var tcp_port = config.tcp_port;
     var server_ip = config.server_ip;
@@ -101,50 +92,61 @@ public class ClientMain {
     var remote_registry_port = config.remote_registry_port;
     var stub_name = config.stub_name;
 
-    // flag
-    var doInitialLogin = false;
-
     System.out.println("welcome to Winsome CLI!");
 
-    // remote method invocation
-    var remoteServer = Wrapper.<IRemoteServer>of(null);
-    try {
-      remoteServer.value = configureRMI(remote_registry_port, stub_name);
-    } catch (RemoteException e1) {
-      System.out.println("Uh-oh, the server seems to be offline");
-      return;
-    } catch (NotBoundException e1) {
-      System.out.println("Uh-oh, the server seems to be offline");
-      return;
-    }
-
-    var remoteClient = Wrapper.<RemoteClient>of(null);
-    var stub = Wrapper.<IRemoteClient>of(null);
+    // Path instance referring to the file containing the jwt token
+    var authPath = Paths.get(auth_token_path);
 
     // try to recover the token of the previous session
-    var path = Paths.get(auth_token_path);
+    var doInitialLogin = recoverJWTTokenFromFile(authPath);
+
+    // remote method invocation configuration
+    var remoteServer = Wrapper.<IRemoteServer>of(null);
+    var remoteClient = Wrapper.<RemoteClient>of(null);
+    var stub = Wrapper.<IRemoteClient>of(null);
     try {
-
-      var jwt = Files.readString(path);
-      JWT = jwt;
-
-      var eusername = WinsomeJWT.extractUsernameFromJWT(jwt);
-      if (eusername.isLeft()) {
-        System.out.println(eusername.getLeft() + ", please login again");
-      } else {
-        username = eusername.get();
-        doInitialLogin = true;
-        System.out.println("logged as " + username);
-      }
-
-    } catch (IOException ex) {
-      System.out.println("no auth token found, please login again");
+      remoteServer.value = configureRMI(remote_registry_port, stub_name);
+    } catch (RemoteException | NotBoundException e2) {
+      System.out.println("Uh-oh, the server seems to be offline");
+      return;
     }
 
     // -
     // set callbacks
-
     // on login
+    setOnLoginCallback(remoteServer, remoteClient, stub);
+    // when the jwt token has been refreshed
+    setOnRefreshedJWTCallback(authPath);
+    // on logout
+    setOnLogoutCallback(authPath, remoteServer, stub);
+
+    // open the tcp socker
+    try (var socket = new Socket(server_ip, tcp_port)) {
+
+      // BufferedInputStream because I have to read a precise
+      // amount of bytes from the socket
+      var inputStream = new BufferedInputStream(socket.getInputStream());
+      // PrintWriter to be able to write strings
+      var outputStream = new PrintWriter(socket.getOutputStream(), true);
+
+      if (doInitialLogin) {
+        // run the onLogin callback only if the user was already authenticated
+        onLogin.accept(username, inputStream, outputStream);
+      }
+
+      // start the CLI
+      startCLI(inputStream, outputStream, remoteServer, remoteClient);
+
+    } catch (ConnectException e) {
+      System.out.println("Uh-oh, the server seems to be offline");
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+
+  }
+
+  private static void setOnLoginCallback(Wrapper<IRemoteServer> remoteServer, Wrapper<RemoteClient> remoteClient,
+      Wrapper<IRemoteClient> stub) {
     onLogin = (String username, BufferedInputStream input, PrintWriter output) -> {
       try {
         remoteClient.value = RemoteClient.of(username);
@@ -162,8 +164,9 @@ public class ClientMain {
         e.printStackTrace();
       }
     };
+  }
 
-    // when the token is being refreshed
+  private static void setOnRefreshedJWTCallback(Path authPath) {
     onRefreshedJWT = jwt -> {
 
       // update username
@@ -171,6 +174,8 @@ public class ClientMain {
       var eusername = WinsomeJWT.extractUsernameFromJWT(jwt);
       if (eusername.isLeft()) {
         System.out.println("something went wrong during token refreshing");
+
+        // logout the user
         onLogout.run();
         return;
       } else {
@@ -179,13 +184,15 @@ public class ClientMain {
 
       // update the file containing the token
       try {
-        Files.write(path, jwt.getBytes());
+        Files.write(authPath, jwt.getBytes());
       } catch (IOException e) {
         e.printStackTrace();
       }
     };
+  }
 
-    // on logout
+  private static void setOnLogoutCallback(Path authPath, Wrapper<IRemoteServer> remoteServer,
+      Wrapper<IRemoteClient> stub) {
     onLogout = () -> {
       JWT = "";
       username = "";
@@ -200,33 +207,46 @@ public class ClientMain {
 
       try {
         // delete the stored token
-        Files.deleteIfExists(path);
+        Files.deleteIfExists(authPath);
       } catch (IOException e) {
         e.printStackTrace();
       }
     };
+  }
 
-    // open the tcp socker
-    try (var socket = new Socket(server_ip, tcp_port)) {
+  private static boolean recoverJWTTokenFromFile(Path path) {
+    try {
 
-      // BufferedInputStream because I have to read a precise
-      // amount of bytes from the socket
-      var inputStream = new BufferedInputStream(socket.getInputStream());
-      var outputStream = new PrintWriter(socket.getOutputStream(), true);
+      var jwt = Files.readString(path);
+      JWT = jwt;
 
-      if (doInitialLogin) {
-        onLogin.accept(username, inputStream, outputStream);
+      var eusername = WinsomeJWT.extractUsernameFromJWT(jwt);
+      if (eusername.isLeft()) {
+        System.out.println(eusername.getLeft() + ", please login again");
+      } else {
+        username = eusername.get();
+        System.out.println("logged as " + username);
+        return true;
       }
 
-      // start the CLI
-      startCLI(inputStream, outputStream, remoteServer, remoteClient);
-
-    } catch (ConnectException e) {
-      System.out.println("Uh-oh, the server seems to be offline");
-    } catch (Exception e) {
-      e.printStackTrace();
+    } catch (IOException ex) {
+      System.out.println("no auth token found, please login again");
     }
+    return false;
+  }
 
+  private static ClientConfig readConfigFromFile(String[] args) {
+    try {
+      var config = objectMapper.readValue(new File(args[0]), ClientConfig.class);
+
+      if (!config.isValid()) {
+        throw new RuntimeException("invalid configuration");
+      }
+
+      return config;
+    } catch (Exception e) {
+      throw new RuntimeException("cannot parse server configuration file: " + e.getMessage());
+    }
   }
 
   private static IRemoteServer configureRMI(Integer remoteRegistryPort,
@@ -243,17 +263,18 @@ public class ClientMain {
     headers.put("Content-Length", "0");
     headers.put("Authorization", "Bearer " + JWT);
 
+    // 1 - build and perform the request to get the coordinates
     return HttpRequest.buildGetRequest("/multicast", headers)
         .flatMap(req -> doRequest(req, input, output))
         .flatMap(res -> {
           var body = res.getBody();
 
-          // extract 'res' from JSON
+          // extract data from JSON using JSON pointers
           try {
             var node = objectMapper.readTree(body);
 
             var pointer = JsonPointer.compile("/res");
-            var resValue = node.at(pointer).asText();
+            var resValue = node.at(pointer).asText(); // expected ip:port
 
             var ip = resValue.split(":")[0];
             var port = Integer.parseInt(resValue.split(":")[1]);
@@ -265,6 +286,7 @@ public class ClientMain {
           }
         })
         .map(pair -> () -> {
+          // return a Runnable
           var ip = pair.fst();
           var port = pair.snd();
 
@@ -288,10 +310,7 @@ public class ClientMain {
                 }
 
                 var received = new String(dp.getData(), dp.getOffset(), dp.getLength());
-
-                System.out.println("\n-----------------------------------------------------------------");
-                System.out.println("received push notification from server: " + received);
-                System.out.printf("-----------------------------------------------------------------\n> ");
+                System.out.println("push notification: " + received);
 
               }
 
@@ -317,6 +336,8 @@ public class ClientMain {
         System.out.print("> ");
         var tokens = new LinkedList<String>();
 
+        // get the tokens from the command line
+        // the regex is needed to handle tokens inside double quotes
         var m = Pattern.compile("([^\"]\\S*|\".+?\")\\s*").matcher(scanner.nextLine());
         while (m.find()) {
           tokens.add(m.group(1).replace("\"", ""));
@@ -367,7 +388,7 @@ public class ClientMain {
 
             System.out.println(
                 (String) checkUserIsNotLogged()
-                    .flatMap(__ -> handleRegisterCommandRMI(tokens, input, output, remoteServer.value))
+                    .flatMap(__ -> handleRegisterCommandRMI(tokens, remoteServer.value))
                     .fold(s -> s, s -> s));
 
             // System.out.println(
@@ -385,9 +406,15 @@ public class ClientMain {
             if (eres.isLeft()) {
               System.out.println(eres.getLeft());
             } else {
+              // <jwt token, message>
               var pair = eres.get();
+
+              // call the onRefreshedJWT callback because the jwt has been refreshed
               onRefreshedJWT.accept(pair.fst());
+
+              // call the onLogin callback
               onLogin.accept(username, input, output);
+
               System.out.println(pair.snd());
             }
 
@@ -404,7 +431,9 @@ public class ClientMain {
             if (eres.isLeft()) {
               System.out.println(eres.getLeft());
             } else {
+              // call the onLogout callback
               onLogout.run();
+
               System.out.println(eres.get());
             }
             break;
@@ -424,7 +453,7 @@ public class ClientMain {
             } else {
               var userTags = eres.get();
 
-              // print users
+              // print users and their tags
               String leftAlignFormat = "| %-15s | %-30s %n";
               System.out.format(leftAlignFormat, "Username", "Tags");
               userTags
@@ -469,12 +498,12 @@ public class ClientMain {
             if (eres.isLeft()) {
               System.out.println(eres.getLeft());
             } else {
-              var userTags = eres.get();
+              var posts = eres.get();
 
-              // print users
+              // print posts
               String leftAlignFormat = "| %-15s | %-20s | %-36s %n";
               System.out.format(leftAlignFormat, "Author", "Title", "ID");
-              userTags
+              posts
                   .stream()
                   .forEach(ps -> System.out.format(leftAlignFormat, ps.author, ps.title, ps.uuid));
             }
@@ -509,6 +538,7 @@ public class ClientMain {
                 // show post <id> command has ended successfully
                 var post = eres2.getLeft();
 
+                // print the post
                 System.out.printf("%s%s\n", "Title: ", post.title);
                 System.out.printf("%s%s\n", "Content: ", post.content);
                 System.out.printf("%s%d%s%d%s\n", "Votes: ",
@@ -527,6 +557,7 @@ public class ClientMain {
                 // show feed command has ended successfully
                 var posts = eres2.get();
 
+                // print the posts
                 String leftAlignFormat = "| %-15s | %-20s | %-36s %n";
                 System.out.format(leftAlignFormat, "Author", "Title", "ID");
 
@@ -609,10 +640,12 @@ public class ClientMain {
               String leftAlignFormatHeaders = "| %-30s | %-20s %n";
               System.out.format(leftAlignFormatHeaders, "Date", "Gain");
 
+              // print the history
               pair.snd()
                   .stream()
                   .forEach(t -> System.out.format(leftAlignFormat, new Date(t.timestamp).toString(), t.gain));
 
+              // and the total
               System.out.printf("Total: %22.20f %s\n", pair.fst(), currency);
             }
             break;
@@ -644,35 +677,38 @@ public class ClientMain {
     if (tokens.size() != 2) {
       return Either.left("Invalid use of command follow.\nUse: follow <username>");
     } else {
+      // the user instance that will be sent in the body of the login request
       var newUser = User.of(tokens.get(1), " ", new LinkedList<String>(), false);
       var newUserJSON = newUser.toJSON();
       var newUserJSONLength = newUserJSON.getBytes().length;
 
+      // the needed headers
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", newUserJSONLength + "");
       headers.put("Content-Type", HttpConstants.MIME_APPLICATION_JSON);
       headers.put("Authorization", "Bearer " + JWT);
 
-      var erequest = HttpRequest.buildPostRequest("/users" + "/" + username + "/following", newUserJSON, headers);
+      // build and perform the request
+      return HttpRequest
+          .buildPostRequest("/users" + "/" + username + "/following", newUserJSON, headers)
+          .flatMap(r -> doRequest(r, input, output))
+          .flatMap(res -> {
+            // extract data from JSON using JSON pointers
+            var body = res.getBody();
 
-      var result = erequest.flatMap(r -> doRequest(r, input, output));
+            // res should always be a string
+            try {
+              var node = objectMapper.readTree(body);
 
-      return result.flatMap(res -> {
-        var body = res.getBody();
+              var pointer = JsonPointer.compile("/res");
 
-        // extract 'res' from JSON
-        try {
-          var node = objectMapper.readTree(body);
+              return Either.right(node.at(pointer).asText());
+            } catch (Exception e) {
+              e.printStackTrace();
+              return Either.left(e.getMessage());
+            }
 
-          var pointer = JsonPointer.compile("/res");
-
-          return Either.right(node.at(pointer).asText());
-        } catch (Exception e) {
-          e.printStackTrace();
-          return Either.left(e.getMessage());
-        }
-
-      });
+          });
     }
 
   }
@@ -682,45 +718,48 @@ public class ClientMain {
     if (tokens.size() != 2) {
       return Either.left("Invalid use of command unfollow.\nUse: unfollow <username>");
     } else {
+      // the user instance that will be sent in the body of the login request
       var newUser = User.of(tokens.get(1), " ", new LinkedList<String>(), false);
       var newUserJSON = newUser.toJSON();
       var newUserJSONLength = newUserJSON.getBytes().length;
 
+      // the needed headers
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", newUserJSONLength + "");
       headers.put("Content-Type", HttpConstants.MIME_APPLICATION_JSON);
       headers.put("Authorization", "Bearer " + JWT);
 
-      var erequest = HttpRequest.buildDeleteRequest("/users" + "/" + username + "/following", newUserJSON, headers);
+      // build and perform the request
+      return HttpRequest
+          .buildDeleteRequest("/users" + "/" + username + "/following", newUserJSON, headers)
+          .flatMap(r -> doRequest(r, input, output))
+          .flatMap(res -> {
+            // extract data from JSON using JSON pointers
+            var body = res.getBody();
 
-      var result = erequest.flatMap(r -> doRequest(r, input, output));
+            // res should always be a string
+            try {
+              var node = objectMapper.readTree(body);
 
-      return result.flatMap(res -> {
-        var body = res.getBody();
+              var pointer = JsonPointer.compile("/res");
 
-        // extract 'res' from JSON
-        try {
-          var node = objectMapper.readTree(body);
+              return Either.right(node.at(pointer).asText());
+            } catch (Exception e) {
+              e.printStackTrace();
+              return Either.left(e.getMessage());
+            }
 
-          var pointer = JsonPointer.compile("/res");
-
-          return Either.right(node.at(pointer).asText());
-        } catch (Exception e) {
-          e.printStackTrace();
-          return Either.left(e.getMessage());
-        }
-
-      });
+          });
     }
 
   }
 
-  private static Either<String, String> handleRegisterCommandRMI(List<String> tokens, BufferedInputStream input,
-      PrintWriter output, IRemoteServer remoteServer) {
+  private static Either<String, String> handleRegisterCommandRMI(List<String> tokens, IRemoteServer remoteServer) {
 
     if (tokens.size() < 4) {
       return Either.left("Invalid use of command register.\nUse: register <username> <password> <tags>");
     } else {
+      // sign up by using the remote method invocation
       var username = tokens.get(1);
       var password = tokens.get(2);
       var tags = new ArrayList<>(tokens.subList(3, tokens.size()));
@@ -742,34 +781,36 @@ public class ClientMain {
     if (tokens.size() < 4) {
       return Either.left("Invalid use of command register.\nUse: register <username> <password> <tags>");
     } else {
+      // the user instance that will be sent in the body of the login request
       var newUser = User.of(tokens.get(1), tokens.get(2), tokens.subList(3, tokens.size()), false);
       var newUserJSON = newUser.toJSON();
       var newUserJSONLength = newUserJSON.getBytes().length;
 
+      // the needed headers
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", newUserJSONLength + "");
       headers.put("Content-Type", HttpConstants.MIME_APPLICATION_JSON);
 
-      var erequest = HttpRequest.buildPostRequest("/users", newUserJSON, headers);
+      // build and perform the request
+      return HttpRequest.buildPostRequest("/users", newUserJSON, headers)
+          .flatMap(r -> doRequest(r, input, output))
+          .flatMap(res -> {
+            // extract data from JSON using JSON pointers
+            var body = res.getBody();
 
-      var result = erequest.flatMap(r -> doRequest(r, input, output));
+            try {
+              // res should always be a string
+              var node = objectMapper.readTree(body);
 
-      return result.flatMap(res -> {
-        var body = res.getBody();
+              var pointer = JsonPointer.compile("/res");
 
-        // extract 'res' from JSON
-        try {
-          var node = objectMapper.readTree(body);
+              return Either.right(node.at(pointer).asText());
+            } catch (Exception e) {
+              e.printStackTrace();
+              return Either.left(e.getMessage());
+            }
 
-          var pointer = JsonPointer.compile("/res");
-
-          return Either.right(node.at(pointer).asText());
-        } catch (Exception e) {
-          e.printStackTrace();
-          return Either.left(e.getMessage());
-        }
-
-      });
+          });
     }
 
   }
@@ -782,51 +823,52 @@ public class ClientMain {
     } else if ((tokens.size() != 3 && tokens.size() != 4) || (tokens.size() == 4 && !tokens.get(3).equals("-f"))) {
       return Either.left("Invalid use of command login.\nUse: login <username> <password> [-f]");
     } else {
+      // the user instance that will be sent in the body of the login request
       var usernamePassword = User.of(tokens.get(1), tokens.get(2), new LinkedList<>(), false);
       var usernamePasswordJSON = usernamePassword.toJSON();
       var usernamePasswordJSONLength = usernamePasswordJSON.getBytes().length;
 
+      // is it a forced login
       var isForced = tokens.size() == 4;
 
+      // the needed headers
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", usernamePasswordJSONLength + "");
       headers.put("Content-Type", HttpConstants.MIME_APPLICATION_JSON);
 
-      var erequest = HttpRequest.buildPostRequest(
-          "/login" + (isForced ? "?force=true" : ""),
-          usernamePasswordJSON,
-          headers);
+      // build and perform the request
+      return HttpRequest
+          .buildPostRequest("/login" + (isForced ? "?force=true" : ""), usernamePasswordJSON, headers)
+          .flatMap(r -> doRequest(r, input, output))
+          .flatMap(res -> {
+            // extract data from JSON using JSON pointers
+            var body = res.getBody();
 
-      var result = erequest.flatMap(r -> doRequest(r, input, output));
+            try {
+              var node = objectMapper.readTree(body);
 
-      return result.flatMap(res -> {
-        var body = res.getBody();
+              var pointer = JsonPointer.compile("/res");
+              if (node.at(pointer).isObject()) {
+                // login has been successful
+                var pointerJWT = JsonPointer.compile("/res/jwt");
+                var pointerMessage = JsonPointer.compile("/res/message");
 
-        // extract 'jwt' and 'message' from JSON
-        try {
-          var node = objectMapper.readTree(body);
+                var toRet = Pair.of(
+                    node.at(pointerJWT).asText(),
+                    node.at(pointerMessage).asText());
 
-          var pointer = JsonPointer.compile("/res");
-          if (node.at(pointer).isObject()) {
-            var pointerJWT = JsonPointer.compile("/res/jwt");
-            var pointerMessage = JsonPointer.compile("/res/message");
+                return Either.right(toRet);
+              } else {
+                // res should be a message containing an error
+                return Either.left(node.at(pointer).asText());
+              }
 
-            var toRet = Pair.of(
-                node.at(pointerJWT).asText(),
-                node.at(pointerMessage).asText());
+            } catch (Exception e) {
+              e.printStackTrace();
+              return Either.left(e.getMessage());
+            }
 
-            return Either.right(toRet);
-          } else {
-            // res should be a message containing an error
-            return Either.left(node.at(pointer).asText());
-          }
-
-        } catch (Exception e) {
-          e.printStackTrace();
-          return Either.left(e.getMessage());
-        }
-
-      });
+          });
     }
 
   }
@@ -837,29 +879,31 @@ public class ClientMain {
       return Either.left("Invalid use of command logout.\nUse: logout");
     } else {
 
+      // needed headers
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", "0");
       headers.put("Authorization", "Bearer " + JWT);
 
-      var erequest = HttpRequest.buildPostRequest("/logout", "", headers);
+      // build and perform the request
+      return HttpRequest
+          .buildPostRequest("/logout", "", headers)
+          .flatMap(r -> doRequest(r, input, output))
+          .flatMap(res -> {
+            // extract data from JSON using JSON pointers
+            var body = res.getBody();
 
-      var result = erequest.flatMap(r -> doRequest(r, input, output));
+            try {
+              // res should always be a string
+              var node = objectMapper.readTree(body);
 
-      return result.flatMap(res -> {
-        // extract 'res' from JSON
-        var body = res.getBody();
+              var pointer = JsonPointer.compile("/res");
 
-        try {
-          var node = objectMapper.readTree(body);
-
-          var pointer = JsonPointer.compile("/res");
-
-          return Either.right(node.at(pointer).asText());
-        } catch (Exception e) {
-          e.printStackTrace();
-          return Either.left(e.getMessage());
-        }
-      });
+              return Either.right(node.at(pointer).asText());
+            } catch (Exception e) {
+              e.printStackTrace();
+              return Either.left(e.getMessage());
+            }
+          });
 
     }
   }
@@ -882,6 +926,8 @@ public class ClientMain {
       if (endpoint.equals("followers")) {
 
         try {
+          // transform the map containing the followers of the current user
+          // and their tags into a list of UserTags instances
           var toRet = remoteClient
               .getFollowers()
               .entrySet()
@@ -891,7 +937,7 @@ public class ClientMain {
 
           return Either.right(toRet);
 
-        } catch (RemoteException e) {
+        } catch (Exception e) {
 
           e.printStackTrace();
 
@@ -900,6 +946,9 @@ public class ClientMain {
 
       }
 
+      // handle list following and list users using the rest api
+
+      // select the target
       var target = "/";
       if (endpoint.equals("followers") || endpoint.equals("following")) {
         target += "users/" + username + "/" + endpoint;
@@ -907,39 +956,41 @@ public class ClientMain {
         target += endpoint;
       }
 
+      // needed headers
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", "0");
       headers.put("Authorization", "Bearer " + JWT);
 
-      var erequest = HttpRequest.buildGetRequest(target, headers);
+      // build and perform the request
+      return HttpRequest
+          .buildGetRequest(target, headers)
+          .flatMap(r -> doRequest(r, input, output))
+          .flatMap(res -> {
+            // extract data from JSON using JSON pointers
+            var body = res.getBody();
 
-      var result = erequest.flatMap(r -> doRequest(r, input, output));
+            try {
+              var node = objectMapper.readTree(body);
+              var pointerRes = JsonPointer.compile("/res");
+              var pointerOk = JsonPointer.compile("/ok");
 
-      return result.flatMap(res -> {
-        // extract data from JSON
-        var body = res.getBody();
+              var isOk = node.at(pointerOk).asBoolean();
+              if (isOk) {
+                // res is expected to be an array of UserTags
+                return Either.right(
+                    objectMapper
+                        .convertValue(node.at(pointerRes), new TypeReference<List<UserTags>>() {
+                        }));
+              } else {
+                // an error has occurred, res should be a string
+                return Either.left(node.at(pointerRes).asText());
+              }
 
-        try {
-          var node = objectMapper.readTree(body);
-          var pointerRes = JsonPointer.compile("/res");
-          var pointerOk = JsonPointer.compile("/ok");
-
-          var isOk = node.at(pointerOk).asBoolean();
-          if (isOk) {
-            // res is expected to be an array of UserTags
-            return Either.right(
-                objectMapper
-                    .convertValue(node.at(pointerRes), new TypeReference<List<UserTags>>() {
-                    }));
-          } else {
-            return Either.left(node.at(pointerRes).asText());
-          }
-
-        } catch (Exception e) {
-          e.printStackTrace();
-          return Either.left(e.getMessage());
-        }
-      });
+            } catch (Exception e) {
+              e.printStackTrace();
+              return Either.left(e.getMessage());
+            }
+          });
 
     }
   }
@@ -959,6 +1010,7 @@ public class ClientMain {
       return Either.left("Invalid use of command show.\nUse: show feed || show post <id>");
     } else {
 
+      // select the target
       var target = "";
 
       if (isShowFeed) {
@@ -967,53 +1019,58 @@ public class ClientMain {
         target += "/posts" + "/" + tokens.get(2);
       }
 
+      // needed headers
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", "0");
       headers.put("Authorization", "Bearer " + JWT);
 
-      var erequest = HttpRequest.buildGetRequest(target, headers);
+      // build and perform the request
+      return HttpRequest
+          .buildGetRequest(target, headers)
+          .flatMap(r -> doRequest(r, input, output))
+          .flatMap(res -> {
+            // extract data from JSON using JSON pointers
+            var body = res.getBody();
 
-      var result = erequest.flatMap(r -> doRequest(r, input, output));
+            try {
+              var node = objectMapper.readTree(body);
+              var pointerRes = JsonPointer.compile("/res");
+              var pointerOk = JsonPointer.compile("/ok");
 
-      return result.flatMap(res -> {
-        // extract data from JSON
-        var body = res.getBody();
+              var isOk = node.at(pointerOk).asBoolean();
+              if (isOk) {
+                // if the command was 'show feed'
+                if (isShowFeed) {
 
-        try {
-          var node = objectMapper.readTree(body);
-          var pointerRes = JsonPointer.compile("/res");
-          var pointerOk = JsonPointer.compile("/ok");
+                  // res is expected to be an array of Posts
+                  var posts = objectMapper
+                      .convertValue(node.at(pointerRes), new TypeReference<List<Post>>() {
+                      });
 
-          var isOk = node.at(pointerOk).asBoolean();
-          if (isOk) {
-            if (isShowFeed) {
+                  return Either.right(Either.right(posts));
 
-              // res is expected to be an array of Posts
-              var posts = objectMapper
-                  .convertValue(node.at(pointerRes), new TypeReference<List<Post>>() {
-                  });
+                  // if the command was 'show post <id>'
+                } else if (isShowPost) {
 
-              return Either.right(Either.right(posts));
-            } else if (isShowPost) {
+                  // res is expected to be a single Post
+                  var post = objectMapper
+                      .convertValue(node.at(pointerRes), new TypeReference<Post>() {
+                      });
 
-              // res is expected to be a single Post
-              var post = objectMapper
-                  .convertValue(node.at(pointerRes), new TypeReference<Post>() {
-                  });
+                  return Either.right(Either.left(post));
+                } else {
+                  throw new RuntimeException("should not happen");
+                }
+              } else {
+                // otherwise 'res' is expected to be an error message
+                return Either.left(node.at(pointerRes).asText());
+              }
 
-              return Either.right(Either.left(post));
-            } else {
-              throw new RuntimeException("should not happen");
+            } catch (Exception e) {
+              e.printStackTrace();
+              return Either.left(e.getMessage());
             }
-          } else {
-            return Either.left(node.at(pointerRes).asText());
-          }
-
-        } catch (Exception e) {
-          e.printStackTrace();
-          return Either.left(e.getMessage());
-        }
-      });
+          });
 
     }
 
@@ -1026,39 +1083,40 @@ public class ClientMain {
       return Either.left("Invalid use of command blog.\nUse: blog");
     } else {
 
+      // needed header
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", "0");
       headers.put("Authorization", "Bearer " + JWT);
 
-      var erequest = HttpRequest.buildGetRequest("/users" + "/" + username + "/blog", headers);
+      // build and perform the request
+      return HttpRequest
+          .buildGetRequest("/users" + "/" + username + "/blog", headers)
+          .flatMap(r -> doRequest(r, input, output))
+          .flatMap(res -> {
+            // extract data from JSON using JSON pointers
+            var body = res.getBody();
 
-      var result = erequest.flatMap(r -> doRequest(r, input, output));
+            try {
+              var node = objectMapper.readTree(body);
+              var pointerRes = JsonPointer.compile("/res");
+              var pointerOk = JsonPointer.compile("/ok");
 
-      return result.flatMap(res -> {
-        // extract data from JSON
-        var body = res.getBody();
+              var isOk = node.at(pointerOk).asBoolean();
+              if (isOk) {
+                // res is expected to be an array of Posts
+                return Either.right(
+                    objectMapper
+                        .convertValue(node.at(pointerRes), new TypeReference<List<Post>>() {
+                        }));
+              } else {
+                return Either.left(node.at(pointerRes).asText());
+              }
 
-        try {
-          var node = objectMapper.readTree(body);
-          var pointerRes = JsonPointer.compile("/res");
-          var pointerOk = JsonPointer.compile("/ok");
-
-          var isOk = node.at(pointerOk).asBoolean();
-          if (isOk) {
-            // res is expected to be an array of UserTags
-            return Either.right(
-                objectMapper
-                    .convertValue(node.at(pointerRes), new TypeReference<List<Post>>() {
-                    }));
-          } else {
-            return Either.left(node.at(pointerRes).asText());
-          }
-
-        } catch (Exception e) {
-          e.printStackTrace();
-          return Either.left(e.getMessage());
-        }
-      });
+            } catch (Exception e) {
+              e.printStackTrace();
+              return Either.left(e.getMessage());
+            }
+          });
 
     }
   }
@@ -1069,41 +1127,44 @@ public class ClientMain {
       return Either.left("Invalid use of command post.\nUse: post <title> <content>");
     } else {
 
+      // the post to be sent as JSON
       var post = Post.of(tokens.get(1), tokens.get(2), username);
 
+      // needed headers
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", post.toJSON().getBytes().length + "");
       headers.put("Authorization", "Bearer " + JWT);
+      headers.put("Content-Type", HttpConstants.MIME_APPLICATION_JSON);
 
-      var erequest = HttpRequest.buildPostRequest("/users" + "/" + username + "/posts", post.toJSON(), headers);
+      // build and perform the request
+      return HttpRequest
+          .buildPostRequest("/users" + "/" + username + "/posts", post.toJSON(), headers)
+          .flatMap(r -> doRequest(r, input, output))
+          .flatMap(res -> {
+            // extract data from JSON using JSON pointers
+            var body = res.getBody();
 
-      var result = erequest.flatMap(r -> doRequest(r, input, output));
+            try {
+              var node = objectMapper.readTree(body);
+              var pointerRes = JsonPointer.compile("/res");
+              var pointerOk = JsonPointer.compile("/ok");
 
-      return result.flatMap(res -> {
-        // extract data from JSON
-        var body = res.getBody();
+              var isOk = node.at(pointerOk).asBoolean();
+              if (isOk) {
+                // res is expected to be a post
+                return Either.right(
+                    objectMapper
+                        .convertValue(node.at(pointerRes), new TypeReference<Post>() {
+                        }).title);
+              } else {
+                return Either.left(node.at(pointerRes).asText());
+              }
 
-        try {
-          var node = objectMapper.readTree(body);
-          var pointerRes = JsonPointer.compile("/res");
-          var pointerOk = JsonPointer.compile("/ok");
-
-          var isOk = node.at(pointerOk).asBoolean();
-          if (isOk) {
-            // res is expected to be a post
-            return Either.right(
-                objectMapper
-                    .convertValue(node.at(pointerRes), new TypeReference<Post>() {
-                    }).title);
-          } else {
-            return Either.left(node.at(pointerRes).asText());
-          }
-
-        } catch (Exception e) {
-          e.printStackTrace();
-          return Either.left(e.getMessage());
-        }
-      });
+            } catch (Exception e) {
+              e.printStackTrace();
+              return Either.left(e.getMessage());
+            }
+          });
 
     }
   }
@@ -1114,40 +1175,40 @@ public class ClientMain {
       return Either.left("Invalid use of command rewin.\nUse: rewin <idPost>");
     } else {
 
+      // needed headers
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", "0");
       headers.put("Authorization", "Bearer " + JWT);
 
-      var erequest = HttpRequest.buildPostRequest("/users" + "/" + username + "/posts" + "?" +
-          "rewinPost=" + tokens.get(1), "", headers);
+      // build and perform the request
+      return HttpRequest
+          .buildPostRequest("/users" + "/" + username + "/posts" + "?" + "rewinPost=" + tokens.get(1), "", headers)
+          .flatMap(r -> doRequest(r, input, output))
+          .flatMap(res -> {
+            // extract data from JSON using JSON pointers
+            var body = res.getBody();
 
-      var result = erequest.flatMap(r -> doRequest(r, input, output));
+            try {
+              var node = objectMapper.readTree(body);
+              var pointerRes = JsonPointer.compile("/res");
+              var pointerOk = JsonPointer.compile("/ok");
 
-      return result.flatMap(res -> {
-        // extract data from JSON
-        var body = res.getBody();
+              var isOk = node.at(pointerOk).asBoolean();
+              if (isOk) {
+                // res is expected to be a post
+                return Either.right(
+                    objectMapper
+                        .convertValue(node.at(pointerRes), new TypeReference<Post>() {
+                        }).title);
+              } else {
+                return Either.left(node.at(pointerRes).asText());
+              }
 
-        try {
-          var node = objectMapper.readTree(body);
-          var pointerRes = JsonPointer.compile("/res");
-          var pointerOk = JsonPointer.compile("/ok");
-
-          var isOk = node.at(pointerOk).asBoolean();
-          if (isOk) {
-            // res is expected to be a post
-            return Either.right(
-                objectMapper
-                    .convertValue(node.at(pointerRes), new TypeReference<Post>() {
-                    }).title);
-          } else {
-            return Either.left(node.at(pointerRes).asText());
-          }
-
-        } catch (Exception e) {
-          e.printStackTrace();
-          return Either.left(e.getMessage());
-        }
-      });
+            } catch (Exception e) {
+              e.printStackTrace();
+              return Either.left(e.getMessage());
+            }
+          });
 
     }
   }
@@ -1158,45 +1219,44 @@ public class ClientMain {
       return Either.left("Invalid use of command delete.\nUse: delete <idPost>");
     } else {
 
+      // needed headers
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", "0");
       headers.put("Authorization", "Bearer " + JWT);
 
-      var erequest = HttpRequest.buildDeleteRequest("/users" + "/" + username + "/posts" + "/" + tokens.get(1), "",
-          headers);
+      // build and perform the request
+      return HttpRequest
+          .buildDeleteRequest("/users" + "/" + username + "/posts" + "/" + tokens.get(1), "", headers)
+          .flatMap(r -> doRequest(r, input, output))
+          .flatMap(res -> {
+            // extract data from JSON using JSON pointers
+            var body = res.getBody();
 
-      var result = erequest.flatMap(r -> doRequest(r, input, output));
+            try {
 
-      return result.flatMap(res -> {
-        var body = res.getBody();
+              var node = objectMapper.readTree(body);
+              var pointerRes = JsonPointer.compile("/res");
+              var pointerOk = JsonPointer.compile("/ok");
 
-        // extract 'res' from JSON
+              var isOk = node.at(pointerOk).asBoolean();
 
-        try {
+              if (isOk) {
+                // res is expected to be a post
+                return Either.right(
+                    objectMapper
+                        .convertValue(node.at(pointerRes), new TypeReference<Post>() {
+                        }).uuid);
+              } else {
+                // res is expected to be a string
+                return Either.left(node.at(pointerRes).asText());
+              }
 
-          var node = objectMapper.readTree(body);
-          var pointerRes = JsonPointer.compile("/res");
-          var pointerOk = JsonPointer.compile("/ok");
+            } catch (Exception e) {
+              e.printStackTrace();
+              return Either.left(e.getMessage());
+            }
 
-          var isOk = node.at(pointerOk).asBoolean();
-
-          if (isOk) {
-            // res is expected to be a post
-            return Either.right(
-                objectMapper
-                    .convertValue(node.at(pointerRes), new TypeReference<Post>() {
-                    }).uuid);
-          } else {
-            // res is expected to be a string
-            return Either.left(node.at(pointerRes).asText());
-          }
-
-        } catch (Exception e) {
-          e.printStackTrace();
-          return Either.left(e.getMessage());
-        }
-
-      });
+          });
 
     }
   }
@@ -1207,6 +1267,7 @@ public class ClientMain {
       return Either.left("Invalid use of command rate.\nUse: rate <idPost> +1/-1");
     } else {
 
+      // needed headers
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", "0");
       headers.put("Authorization", "Bearer " + JWT);
@@ -1216,6 +1277,7 @@ public class ClientMain {
           .buildGetRequest("/posts" + "/" + tokens.get(1) + "?author=true", headers)
           .flatMap(r -> doRequest(r, input, output))
           .flatMap(res -> {
+            // extract data from JSON using JSON pointers
             var body = res.getBody();
 
             try {
@@ -1240,22 +1302,22 @@ public class ClientMain {
             }
 
           })
-          .flatMap(a -> {
+          .flatMap(author -> {
 
             // 2 - rate the post
-            var isUpvote = tokens.get(2).equals("+1") ? true : false;
+            var isUpvote = tokens.get(2).equals("+1");
             var reaction = Reaction.of(isUpvote, "", "").toJSON();
 
             headers.put("Content-Length", reaction.getBytes().length + "");
             headers.put("Content-Type", HttpConstants.MIME_APPLICATION_JSON);
 
             return HttpRequest
-                .buildPostRequest("/users" + "/" + a + "/posts" + "/" + tokens.get(1) + "/reactions",
-                    reaction,
+                .buildPostRequest("/users" + "/" + author + "/posts" + "/" + tokens.get(1) + "/reactions", reaction,
                     headers);
           })
           .flatMap(r -> doRequest(r, input, output))
           .flatMap(res -> {
+            // extract data from JSON using JSON pointers
             var body = res.getBody();
 
             try {
@@ -1292,6 +1354,7 @@ public class ClientMain {
       return Either.left("Invalid use of command comment.\nUse: comment <idPost> <comment>");
     } else {
 
+      // headers for the get request
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", "0");
       headers.put("Authorization", "Bearer " + JWT);
@@ -1301,6 +1364,7 @@ public class ClientMain {
           .buildGetRequest("/posts" + "/" + tokens.get(1) + "?author=true", headers)
           .flatMap(r -> doRequest(r, input, output))
           .flatMap(res -> {
+            // extract data from JSON using JSON pointers
             var body = res.getBody();
 
             try {
@@ -1325,22 +1389,22 @@ public class ClientMain {
             }
 
           })
-          .flatMap(a -> {
+          .flatMap(author -> {
 
             // 2 - comment the post
             var postUuid = tokens.get(1);
             var comment = Comment.of(tokens.get(2), "", "").toJSON();
 
+            // update the headers
             headers.put("Content-Length", comment.getBytes().length + "");
             headers.put("Content-Type", HttpConstants.MIME_APPLICATION_JSON);
 
             return HttpRequest
-                .buildPostRequest("/users" + "/" + a + "/posts" + "/" + postUuid + "/comments",
-                    comment,
-                    headers);
+                .buildPostRequest("/users" + "/" + author + "/posts" + "/" + postUuid + "/comments", comment, headers);
           })
           .flatMap(r -> doRequest(r, input, output))
           .flatMap(res -> {
+            // extract data from JSON using JSON pointers
             var body = res.getBody();
 
             try {
@@ -1379,46 +1443,48 @@ public class ClientMain {
       return Either.left("Invalid use of command wallet.\nUse: wallet || wallet btc");
     } else {
 
+      // compute which currency to use to make the request
       var useBTC = tokens.size() == 2;
       var currency = useBTC ? "currency=bitcoin" : "currency=wincoin";
 
+      // needed headers
       var headers = new HashMap<String, String>();
       headers.put("Content-Length", "0");
       headers.put("Authorization", "Bearer " + JWT);
 
-      var erequest = HttpRequest.buildGetRequest("/users" + "/" + username + "/wallet" + "?" + currency, headers);
+      // build and perform the request
+      return HttpRequest
+          .buildGetRequest("/users" + "/" + username + "/wallet" + "?" + currency, headers)
+          .flatMap(r -> doRequest(r, input, output))
+          .flatMap(res -> {
+            // extract data from JSON using JSON pointers
+            var body = res.getBody();
 
-      var result = erequest.flatMap(r -> doRequest(r, input, output));
+            try {
+              var node = objectMapper.readTree(body);
+              var pointerRes = JsonPointer.compile("/res");
+              var pointerResHistory = JsonPointer.compile("/res/history");
+              var pointerResTotal = JsonPointer.compile("/res/total");
+              var pointerOk = JsonPointer.compile("/ok");
 
-      return result.flatMap(res -> {
-        // extract data from JSON
-        var body = res.getBody();
+              var isOk = node.at(pointerOk).asBoolean();
+              if (isOk) {
+                // res is expected to be an object { history: Transaction[], total }
+                return Either.right(
+                    Pair.of(
+                        node.at(pointerResTotal).asDouble(),
+                        objectMapper
+                            .convertValue(node.at(pointerResHistory), new TypeReference<List<WalletTransaction>>() {
+                            })));
+              } else {
+                return Either.left(node.at(pointerRes).asText());
+              }
 
-        try {
-          var node = objectMapper.readTree(body);
-          var pointerRes = JsonPointer.compile("/res");
-          var pointerResHistory = JsonPointer.compile("/res/history");
-          var pointerResTotal = JsonPointer.compile("/res/total");
-          var pointerOk = JsonPointer.compile("/ok");
-
-          var isOk = node.at(pointerOk).asBoolean();
-          if (isOk) {
-            // res is expected to be an object { history: Transaction[], total }
-            return Either.right(
-                Pair.of(
-                    node.at(pointerResTotal).asDouble(),
-                    objectMapper
-                        .convertValue(node.at(pointerResHistory), new TypeReference<List<WalletTransaction>>() {
-                        })));
-          } else {
-            return Either.left(node.at(pointerRes).asText());
-          }
-
-        } catch (Exception e) {
-          e.printStackTrace();
-          return Either.left(e.getMessage());
-        }
-      });
+            } catch (Exception e) {
+              e.printStackTrace();
+              return Either.left(e.getMessage());
+            }
+          });
 
     }
 
@@ -1434,8 +1500,10 @@ public class ClientMain {
 
     // parse response
     var octet = -1;
+    // counter to track the read amount of the body
     var contentLength = -1;
 
+    // read byte after byte
     try (var res = new ByteArrayBuilder();) {
 
       // we have to detect the end of an HTTP response
@@ -1457,7 +1525,7 @@ public class ClientMain {
           }
 
           // looking for the sequence CR LF CR LF
-          if (new String(res.toByteArray()).lastIndexOf("\r\n\r\n") == -1) {
+          if (new String(res.toByteArray()).lastIndexOf(HttpConstants.CRLF + HttpConstants.CRLF) == -1) {
             // not found, try again
             continue;
           }
@@ -1470,10 +1538,12 @@ public class ClientMain {
             return Either.left(eres.getLeft());
           }
 
+          // get the content length header
           var contentLengthHeader = eres.get().getHeaders().get("Content-Length");
           var isThereContentLengthHeader = contentLengthHeader != null;
 
           if (!isThereContentLengthHeader) {
+            // always required
             return Either.left("Invalid HTTP response: missing Content-Length header");
           }
 
@@ -1489,6 +1559,7 @@ public class ClientMain {
 
       resp.forEach(r -> {
         if (r.getStatusCode().equals("401")) {
+          // the jwt token is not valid, the user should login again
           System.out.println("you have been logged out because of an unauthorized request");
           onLogout.run();
         }
@@ -1499,6 +1570,7 @@ public class ClientMain {
 
   }
 
+  // return an error in the form of a string if the user is not logged
   private static Either<String, Void> checkUserIsLogged() {
     if (username.equals("")) {
       return Either.left("error: user is not logged");
@@ -1507,6 +1579,7 @@ public class ClientMain {
     }
   }
 
+  // return an error in the form of a string if the user is logged
   private static Either<String, Void> checkUserIsNotLogged() {
     if (!username.equals("")) {
       return Either.left("error: user is logged");

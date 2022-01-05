@@ -3,14 +3,15 @@ package client.RMI;
 import java.rmi.RemoteException;
 import java.rmi.server.RemoteObject;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 public class RemoteClient extends RemoteObject implements IRemoteClient {
 
   private String username = "";
-  private Map<String, List<String>> followers = new HashMap<>();
+  private Map<String, List<String>> followers = new ConcurrentHashMap<>();
 
   private RemoteClient(String username) {
     super();
@@ -19,20 +20,25 @@ public class RemoteClient extends RemoteObject implements IRemoteClient {
 
   @Override
   public void replaceFollowers(Map<String, List<String>> fs) throws RemoteException {
-    if (fs != null)
-      this.followers = fs;
+    this.followers = fs
+        .entrySet()
+        .stream()
+        .collect(Collectors.toConcurrentMap(e -> e.getKey(), e -> e.getValue()));
   }
 
   @Override
   public void newFollower(String user, List<String> tags) throws RemoteException {
-    if (user != null)
+    if (user != null) {
       this.followers.compute(user, (k, v) -> tags);
+    }
+
   }
 
   @Override
   public void deleteFollower(String user) throws RemoteException {
-    if (user != null)
-      this.followers.remove(user);
+    if (user != null) {
+      this.followers.compute(user, (k, v) -> null);
+    }
   }
 
   @Override
@@ -40,7 +46,9 @@ public class RemoteClient extends RemoteObject implements IRemoteClient {
     return username;
   }
 
-  public Map<String, List<String>> getFollowers() throws RemoteException {
+  // not available to the server
+  public Map<String, List<String>> getFollowers() {
+    // return an immutable version of the followers hashmap
     return Collections.unmodifiableMap(followers);
   }
 

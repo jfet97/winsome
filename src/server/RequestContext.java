@@ -7,14 +7,23 @@ import java.util.Arrays;
 import http.HttpResponse;
 import io.vavr.control.Option;
 
+// used as attachment to the channels handled by NIO
 public class RequestContext {
+  // used to store the request
   private byte[] requestBuffer = new byte[128];
-  private Integer head = 0; // first free slot
+  // first free slot into the requestBuffer
+  private Integer head = 0;
 
+  // counter used to store the content length value
   public Integer yetToRead = -1;
+  // this flag indicates an error during some process
   public Boolean isError = false;
+  // this flags indicates if the headers of the request
+  // have already been parsed
   public Boolean headersParsed = false;
+  // used to store the HTTP response to be sent
   private HttpResponse response = null;
+  // used to store the bytes of the HTTP response to be sent
   private ByteBuffer responseBuffer = null;
 
   public void setResponse(HttpResponse res) {
@@ -32,7 +41,8 @@ public class RequestContext {
     return Option.of(this.responseBuffer);
   }
 
-  public void concatBuffer(byte[] another, int amount) {
+  // store new content into the request buffer, increasing its size when necessary
+  public void concatRequestBufferWith(byte[] another, int amount) {
 
     if (amount > requestBuffer.length - head) {
       requestBuffer = Arrays.copyOf(requestBuffer, (int) ((requestBuffer.length + amount) * 1.618033));
@@ -43,7 +53,8 @@ public class RequestContext {
     }
   }
 
-  public String bufferToString(Boolean useUTF8) {
+  // transform the content of the request buffer into a string
+  public String requestBufferToString(Boolean useUTF8) {
 
     var validSubset = Arrays.copyOfRange(requestBuffer, 0, this.head);
     try {
@@ -58,7 +69,8 @@ public class RequestContext {
     }
   }
 
-  public Integer bufferContains(byte[] sub) {
+  // check if the request buffer contain a sequence of bytes
+  public Integer requestBufferContains(byte[] sub) {
 
     try {
       for (var i = 0; i < requestBuffer.length; i++) {
@@ -80,17 +92,18 @@ public class RequestContext {
     } catch (IndexOutOfBoundsException e) {
       return -1;
     }
-
   }
 
-  public Integer getBufferStoredBytes() {
+  public Integer requestBufferContentSize() {
     return this.head;
   }
 
-  public byte[] getBuffer() {
+  public byte[] getRequestBuffer() {
     return requestBuffer.clone();
   }
 
+  // clear the whole instance to be used for
+  // further requests from the same client
   public void clear() {
     this.requestBuffer = new byte[128];
     this.head = 0;

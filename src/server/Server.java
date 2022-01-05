@@ -46,6 +46,7 @@ public class Server implements Runnable {
     return HttpResponse.build200(Feedback.error(message).toJSON(), HttpConstants.MIME_APPLICATION_JSON, true).get();
   }
 
+  // handle the accept "event"
   public void handleAccept(ServerSocketChannel serverChannel, Selector selector) throws IOException {
     // accept the connetion, returns a channel that is properly configured
     var client = serverChannel.accept();
@@ -54,29 +55,34 @@ public class Server implements Runnable {
     // firstly, we have to read a message from the client
     var newClientKey = client.register(selector, SelectionKey.OP_READ);
 
-    // create the context associated with the channel with enough space
+    // create the context associated with the channel
     var clientCtx = RequestContext.of();
 
     // attach the context to the channel
     newClientKey.attach(clientCtx);
   }
 
+  // handle the write "event"
   public void handleWrite(SelectionKey key) throws IOException {
     var clientCtx = (RequestContext) key.attachment();
     var client = (SocketChannel) key.channel();
 
-    // something weird has happened
+    // something weird has happened: there is no response buffer
     if (clientCtx.getResponseBuffer().isEmpty()) {
       clientCtx.isError = true;
       clientCtx.setResponse(internalServerErrorCloseConnection());
     }
 
+    // get the response buffer
     var resBuf = clientCtx.getResponseBuffer().get();
 
+    // if all the response has been sent to the client
     if (!resBuf.hasRemaining()) {
       // clean it up for the next request
       clientCtx.clear();
 
+      // if an error has occurred, here is the right place
+      // to close the connection
       if (clientCtx.isError) {
         key.cancel();
         client.close();
@@ -89,19 +95,21 @@ public class Server implements Runnable {
     }
   }
 
+  // search the sequence CR LF CR LF into a partial HTTP request
+  // to parse the content length header
   public Either<String, Integer> searchCRLFx2(RequestContext clientCtx) {
 
     var error = "";
     var toRet = -1;
 
     // the index of the first carriage return if the CR LF CR LF sequence is present
-    var separatorIndex = clientCtx.bufferContains(Constant.CRLFx2Byte);
+    var separatorIndex = clientCtx.requestBufferContains(Constant.CRLFx2Byte);
 
     // CR LF CR LF sequence was found
     if (separatorIndex != -1) {
 
       // parsing of the partial request to extract the Content-Length header
-      var ereq = HttpRequest.parse(clientCtx.bufferToString(true));
+      var ereq = HttpRequest.parse(clientCtx.requestBufferToString(true));
 
       // invalid http request because parser has failed
       if (ereq.isLeft()) {
@@ -124,7 +132,7 @@ public class Server implements Runnable {
             // skip CR LF CR LF
             var afterindex = separatorIndex + 4;
             // how many bytes of the request have been read
-            var bytesStored = clientCtx.getBufferStoredBytes();
+            var bytesStored = clientCtx.requestBufferContentSize();
 
             // compute the number of missing bytes to read
             if (afterindex == bytesStored) {
@@ -148,10 +156,10 @@ public class Server implements Runnable {
 
         } else if (!noCLRequired) {
           // if there is no Content-Length header and the request is not a GET request nor
-          // a DELETE request the server does not accept that request
+          // a DELETE request nor a OPTIONS request, the server does not accept that request
           error = "missing Content-Length header";
         } else {
-          // GET or DELETE without payload: we have encountered the CR LF CR LF
+          // GET or DELETE or OPTIONS without payload: we have encountered the CR LF CR LF
           // sequence => we have just read the whole request
           toRet = 0;
         }
@@ -169,6 +177,7 @@ public class Server implements Runnable {
 
   }
 
+  // handle the read "event"
   public void handleRead(SelectionKey key, ByteBuffer buf, Selector selector) throws IOException {
 
     var clientCtx = (RequestContext) key.attachment();
@@ -192,7 +201,7 @@ public class Server implements Runnable {
     // concat what has been read into the client's buffer
     var bufArray = buf.array();
     var bufDataLen = buf.position();
-    clientCtx.concatBuffer(bufArray, bufDataLen);
+    clientCtx.concatRequestBufferWith(bufArray, bufDataLen);
 
     if (clientCtx.headersParsed == false) {
       // Content-Length header not yet parsed, we are looking for the CR LF CR LF
@@ -223,7 +232,7 @@ public class Server implements Runnable {
 
     } else if (clientCtx.yetToRead == 0) {
       // nothing more to read
-      var ereq = HttpRequest.parse(clientCtx.bufferToString(true));
+      var ereq = HttpRequest.parse(clientCtx.requestBufferToString(true));
 
       if (ereq.isLeft()) {
         // invalid http request because the parser has failed
@@ -237,7 +246,7 @@ public class Server implements Runnable {
         // get a valid request instance
         var req = ereq.get();
 
-        // handle using a common thread pool
+        // handle using the common thread pool
         var reqResult = CompletableFuture.supplyAsync(() -> jexpress.handle(req));
 
         reqResult.thenAccept(eres -> {

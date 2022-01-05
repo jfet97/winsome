@@ -15,8 +15,11 @@ import winsome.Winsome;
 public class RemoteServer extends RemoteObject implements IRemoteServer {
 
   Winsome winsome;
+  // callback called when a new client registers itself to the followers
+  // notifications
   BiConsumer<String, IRemoteClient> onNewClientFollowersRegistration = (u, rc) -> {
   };
+  // contains all the remotes we have to notify
   private ConcurrentMap<String, IRemoteClient> remotes = new ConcurrentHashMap<>();
 
   private RemoteServer(Winsome winsome, BiConsumer<String, IRemoteClient> onNewClientFollowersRegistration) {
@@ -25,10 +28,12 @@ public class RemoteServer extends RemoteObject implements IRemoteServer {
     this.onNewClientFollowersRegistration = onNewClientFollowersRegistration;
   }
 
+  // signup handler
   @Override
   public Either<String, String> signUp(String username, String password, List<String> tags)
       throws RemoteException {
 
+    // try to register the new user
     return winsome
         .register(username, password, tags).map(u -> u.username);
   }
@@ -37,6 +42,8 @@ public class RemoteServer extends RemoteObject implements IRemoteServer {
   public void registerFollowersCallback(IRemoteClient remoteClient) throws RemoteException {
     // putIfAbsent returns null if there was no previous mapping for the key
     remotes.compute(remoteClient.getUsername(), (k, v) -> {
+      // call the callback before inserting the remote client into the map
+      // (synchronization with the following methods)
       onNewClientFollowersRegistration.accept(k, remoteClient);
       return remoteClient;
     });
@@ -59,6 +66,8 @@ public class RemoteServer extends RemoteObject implements IRemoteServer {
               rc.deleteFollower(performer);
           } catch (RemoteException e) {
             e.printStackTrace();
+            // the client has disconnected without calling the
+            // unregisterFollowersCallback method
             return null;
           }
           return rc;
@@ -73,6 +82,9 @@ public class RemoteServer extends RemoteObject implements IRemoteServer {
             rc.replaceFollowers(fs);
           } catch (RemoteException e) {
             e.printStackTrace();
+            // the client has disconnected without calling the
+            // unregisterFollowersCallback method
+            return null;
           }
           return rc;
         });

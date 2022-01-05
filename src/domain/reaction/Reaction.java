@@ -1,7 +1,7 @@
 package domain.reaction;
 
 import java.util.Date;
-
+// simple pojo
 public class Reaction {
   public Long timestamp;
   public Boolean isUpvote; // true for upvotes, false for downvotes

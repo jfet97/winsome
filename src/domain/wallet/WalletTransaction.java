@@ -2,6 +2,7 @@ package domain.wallet;
 
 import java.util.Date;
 
+// simple record { gain, timestamp }
 public class WalletTransaction {
   public Double gain;
   public Long timestamp;

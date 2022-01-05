@@ -15,7 +15,7 @@ public class User {
   public String username;
   public String password;
   public List<String> tags;
-  public ConcurrentMap<String, Post> posts; // <postUuid, Post>
+  public ConcurrentMap<String, Post> posts; // Map<postUuid, Post>
   public Set<String> followers;
   public Set<String> following;
 
@@ -37,12 +37,20 @@ public class User {
   }
 
   public List<String> getFollowers() {
+    // by returning a clone, we can safely perform
+    // further actions on the list without the need
+    // of the lock, although "the read may not get the latest write"
+    // (eventual consistency)
     synchronized (this.followers) {
       return this.followers.stream().collect(Collectors.toList());
     }
   }
 
   public List<String> getFollowing() {
+    // by returning a clone, we can safely perform
+    // further actions on the list without the need
+    // of the lock, although "the read may not get the latest write"
+    // (eventual consistency)
     synchronized (this.following) {
       return this.following.stream().collect(Collectors.toList());
     }
@@ -72,6 +80,8 @@ public class User {
     }
   }
 
+  // lock the followers to then calling the callback with a clone
+  // of the followers set
   public void synchronizedActionOnFollowers(Consumer<List<String>> cb) {
     synchronized (this.followers) {
       cb.accept(this.followers.stream().collect(Collectors.toList()));

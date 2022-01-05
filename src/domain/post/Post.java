@@ -24,12 +24,13 @@ public class Post {
   public String content;
   public String author;
   public Boolean justDeleted;
-  public List<AuthorPostUuid> rewins; // Pair<author, postUuid>
+  public List<AuthorPostUuid> rewins; // List<{author, postUuid}>
   public List<Comment> comments;
   public List<Reaction> reactions;
-  public Long walletScannerIteration;
+  public Long walletScannerIteration; // current iteration of the wallet thread
 
-  // to store unknown properties
+  // to store unknown properties collected during
+  // json deserialization
   public Map<String, Object> unknowns = new HashMap<>();
 
   @JsonAnySetter
@@ -55,7 +56,12 @@ public class Post {
     return instance;
   }
 
+  // get positive reactions
   public Long getUpvotes() {
+    // by returning a clone, we can safely perform
+    // further actions on the list without the need
+    // of the lock, although "the read may not get the latest write"
+    // (eventual consistency)
     synchronized (this.reactions) {
       return this.reactions
           .stream()
@@ -64,7 +70,12 @@ public class Post {
     }
   }
 
+  // get negative reactions
   public Long getDownvotes() {
+    // by returning a clone, we can safely perform
+    // further actions on the list without the need
+    // of the lock, although "the read may not get the latest write"
+    // (eventual consistency)
     synchronized (this.reactions) {
       return this.reactions
           .stream()
@@ -73,15 +84,29 @@ public class Post {
     }
   }
 
+  // get all the reactions
   public List<Reaction> getReactions() {
+    // by returning a clone, we can safely perform
+    // further actions on the list without the need
+    // of the lock, although "the read may not get the latest write"
+    // (eventual consistency)
     synchronized (reactions) {
-      return this.reactions.stream().collect(Collectors.toList());
+      return this.reactions
+          .stream()
+          .collect(Collectors.toList());
     }
   }
 
+  // get all the comments
   public List<Comment> getComments() {
+    // by returning a clone, we can safely perform
+    // further actions on the list without the need
+    // of the lock, although "the read may not get the latest write"
+    // (eventual consistency)
     synchronized (comments) {
-      return this.comments.stream().collect(Collectors.toList());
+      return this.comments
+      .stream()
+      .collect(Collectors.toList());
     }
   }
 

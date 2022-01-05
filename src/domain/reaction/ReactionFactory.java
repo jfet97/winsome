@@ -14,11 +14,13 @@ public class ReactionFactory {
 
   private static ReactionValidator validator = new ReactionValidator() {
     @Override
+    // validate a post
     public Validation<Seq<String>, Reaction> validateReaction(Boolean isUpvote, String postUuid, String username) {
       return Validation.combine(validateIsUpvote(isUpvote), validatePostUuid(postUuid), validateUsername(username))
           .ap(Reaction::of);
     }
 
+    // validate isUpvote fiels
     private Validation<String, Boolean> validateIsUpvote(Boolean isUpvote) {
       var errorMessage = "";
 
@@ -28,6 +30,7 @@ public class ReactionFactory {
       return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(isUpvote);
     }
 
+    // validate the reference to the post
     private Validation<String, String> validatePostUuid(String postUuid) {
       var errorMessage = "";
       var postUuidTrimmed = postUuid != null ? postUuid.trim() : null;
@@ -40,6 +43,7 @@ public class ReactionFactory {
       return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(postUuidTrimmed);
     }
 
+    // validate the username
     private Validation<String, String> validateUsername(String username) {
       var errorMessage = "";
       var usernameTrimmed = username != null ? username.trim() : null;
@@ -54,6 +58,7 @@ public class ReactionFactory {
 
   };
 
+  // try to create a Reaction instance, collect each error if any
   public static Validation<Seq<String>, Reaction> create(Boolean isUpvote, String postUuid, String username) {
     return validator.validateReaction(isUpvote, postUuid, username);
   }

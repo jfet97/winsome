@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 
 import utils.ToJSON;
 
+// simple record { username, tags }
 public class UserTags {
   public String username;
   public List<String> tags;

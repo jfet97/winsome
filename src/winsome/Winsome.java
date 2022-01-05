@@ -836,7 +836,7 @@ public class Winsome {
                 // greater than the one of the previous iteration of the daemon
                 var reactions = post.getReactions()
                     .stream()
-                    .filter(r -> r.timestamp >= this.wallet.prevTimestamp && r.timestamp < nowTimestamp.value)
+                    .filter(r -> r.timestamp >= this.wallet.getPrevTimestamp() && r.timestamp < nowTimestamp.value)
                     .collect(Collectors.toList());
 
                 // extract the positive reactions
@@ -850,7 +850,7 @@ public class Winsome {
                 // into a list of entries <author, list of its comments to the post>
                 var comments = post.getComments()
                     .stream()
-                    .filter(c -> c.timestamp >= this.wallet.prevTimestamp && c.timestamp < nowTimestamp.value)
+                    .filter(c -> c.timestamp >= this.wallet.getPrevTimestamp() && c.timestamp < nowTimestamp.value)
                     .collect(Collectors.groupingBy(c -> c.author))
                     .entrySet()
                     .stream()
@@ -919,7 +919,7 @@ public class Winsome {
                 }
               });
 
-              this.wallet.prevTimestamp = nowTimestamp.value;
+              this.wallet.setPrevTimestamp(nowTimestamp.value);
 
               // run the action at the end of the wallet updating process
               // if the gain of at least one post was computed

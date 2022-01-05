@@ -3,7 +3,7 @@ package domain.comment;
 import java.util.Date;
 
 import utils.ToJSON;
-
+// simple pojo
 public class Comment {
   public Long timestamp;
   public String text;

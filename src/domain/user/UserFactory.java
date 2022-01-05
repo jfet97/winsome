@@ -16,11 +16,13 @@ public class UserFactory {
 
   private static UserValidator validator = new UserValidator() {
     @Override
+    // validate a user
     public Validation<Seq<String>, User> validateUser(String username, String password, List<String> tags) {
       return Validation.combine(validateUsername(username), validatePassword(password), validateTags(tags))
           .ap(User::of);
     }
 
+    // validate the username
     private Validation<String, String> validateUsername(String username) {
       var errorMessage = "";
       var usernameTrimmed = username != null ? username.trim() : null;
@@ -33,6 +35,7 @@ public class UserFactory {
       return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(usernameTrimmed);
     }
 
+    // validate the password
     private Validation<String, String> validatePassword(String password) {
       var errorMessage = "";
       var passwordTrimmed = password != null ? password.trim() : null;
@@ -45,6 +48,7 @@ public class UserFactory {
       return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(passwordTrimmed);
     }
 
+    // validate the tags
     private Validation<String, List<String>> validateTags(List<String> tags) {
       var errorMessage = "";
 
@@ -56,7 +60,9 @@ public class UserFactory {
       var uniqueTags = tags;
       if (errorMessage.equals("")) {
         uniqueTags = tags.stream()
+            // remove duplicates
             .distinct()
+            // remove empty tags
             .filter(tag -> tag != null && !tag.equals(""))
             .map(String::trim)
             .map(String::toLowerCase)
@@ -72,6 +78,7 @@ public class UserFactory {
     }
   };
 
+  // try to create a User instance, collect each error if any
   public static Validation<Seq<String>, User> create(String username, String password, List<String> tags) {
     return validator.validateUser(username, password, tags);
   }

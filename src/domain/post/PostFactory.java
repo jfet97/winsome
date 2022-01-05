@@ -13,10 +13,12 @@ public class PostFactory {
 
   private static PostValidator validator = new PostValidator() {
     @Override
+    // validate a post
     public Validation<Seq<String>, Post> validatePost(String title, String content, String author) {
       return Validation.combine(validateTitle(title), validateContent(content), validateAuthor(author)).ap(Post::of);
     }
 
+    // validate the title
     private Validation<String, String> validateTitle(String title) {
       var errorMessage = "";
       var titleTrimmed = title != null ? title.trim().replaceAll("\n|\r|\r\n", "") : null;
@@ -31,6 +33,7 @@ public class PostFactory {
       return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(titleTrimmed);
     }
 
+    // validate the content
     private Validation<String, String> validateContent(String content) {
       var errorMessage = "";
       var contentTrimmed = content != null ? content.trim() : null;
@@ -45,11 +48,13 @@ public class PostFactory {
       return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(contentTrimmed);
     }
 
+    // validate the author
     private Validation<String, String> validateAuthor(String author) {
       return author == null ? Validation.invalid("author cannot be null") : Validation.valid(author.trim());
     }
   };
 
+  // try to create a Post instance, collect each error if any
   public static Validation<Seq<String>, Post> create(String title, String content, String author) {
     return validator.validatePost(title, content, author);
   }

@@ -15,7 +15,8 @@ public class Wallet {
   // ConcurrentMap<username, transactions>
   private final ConcurrentMap<String, List<WalletTransaction>> wallet = new ConcurrentHashMap<>();
 
-  public Long prevTimestamp = new Date().getTime();
+  // last time the wallet thread has run
+  public Long prevTimestamp = new Date().getTime(); // needs manual synchronization (wallet and persistence threads)
 
   public static Wallet of() {
     return new Wallet();
@@ -29,21 +30,34 @@ public class Wallet {
     }
   }
 
+  public void setPrevTimestamp(Long value) {
+    synchronized (this) {
+      this.prevTimestamp = value;
+    }
+  }
+
+  public Long getPrevTimestamp() {
+    synchronized (this) {
+      return this.prevTimestamp;
+    }
+  }
+
+  // return an immutable copy of the concurrent map
   public Map<String, List<WalletTransaction>> getWallet() {
     return Collections.unmodifiableMap(this.wallet);
   }
 
-  // does not happen so often
+  // add a user to the wallet
   public Either<String, Void> addUser(String username) {
-
+    // does not happen so often
     return nullGuard(username, "username")
         .map(__ -> this.wallet.computeIfAbsent(username, k -> new LinkedList<WalletTransaction>()))
         .flatMap(__ -> Either.<String, Void>right(null));
   }
 
-  // only the wallet thread will add transactions
+  // add a transaction to the wallet, given a specific user and a gain
   public Either<String, WalletTransaction> addTransaction(String username, Double gain) {
-
+    // only the wallet thread will add transactions
     return nullGuard(username, "username")
         .flatMap(__ -> nullGuard(gain, "gain"))
         .flatMap(__ -> {
@@ -77,7 +91,7 @@ public class Wallet {
 
     return String.join("",
         "{",
-        "\"prevTimestamp\":" + prevTimestamp + ",",
+        "\"prevTimestamp\":" + getPrevTimestamp() + ",",
         walletLine,
         "}");
   }

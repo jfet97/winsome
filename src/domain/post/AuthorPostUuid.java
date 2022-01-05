@@ -2,6 +2,7 @@ package domain.post;
 
 import utils.ToJSON;
 
+// simple record { author, postUuid }
 public class AuthorPostUuid {
 
   public String author;

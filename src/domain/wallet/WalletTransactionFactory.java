@@ -13,10 +13,12 @@ public class WalletTransactionFactory {
 
   private static WalletTransactionValidator validator = new WalletTransactionValidator() {
     @Override
+    // validate a transaction
     public Validation<String, WalletTransaction> validateWalletTransaction(Double gain) {
       return validateGain(gain).map(WalletTransaction::of);
     }
 
+    // validate the gain
     private Validation<String, Double> validateGain(Double gain) {
       var errorMessage = "";
 
@@ -28,6 +30,7 @@ public class WalletTransactionFactory {
 
   };
 
+  // try to create a WalletTransaction instance, collect each error if any
   public static Validation<String, WalletTransaction> create(Double gain) {
     return validator.validateWalletTransaction(gain);
   }

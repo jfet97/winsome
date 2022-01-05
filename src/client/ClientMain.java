@@ -197,7 +197,9 @@ public class ClientMain {
       JWT = "";
       username = "";
 
-      multicastThread.interrupt();
+      if (multicastThread != null) {
+        multicastThread.interrupt();
+      }
 
       try {
         remoteServer.value.unregisterFollowersCallback(stub.value);
@@ -267,19 +269,30 @@ public class ClientMain {
     return HttpRequest.buildGetRequest("/multicast", headers)
         .flatMap(req -> doRequest(req, input, output))
         .flatMap(res -> {
+          // extract data from JSON using JSON pointers
           var body = res.getBody();
 
-          // extract data from JSON using JSON pointers
           try {
             var node = objectMapper.readTree(body);
 
-            var pointer = JsonPointer.compile("/res");
-            var resValue = node.at(pointer).asText(); // expected ip:port
+            var pointerRes = JsonPointer.compile("/res");
+            var pointerOk = JsonPointer.compile("/ok");
 
-            var ip = resValue.split(":")[0];
-            var port = Integer.parseInt(resValue.split(":")[1]);
+            var isOk = node.at(pointerOk).asBoolean();
+            var resValue = node.at(pointerRes).asText();
+            if (isOk) {
+              // res is expected to be string with the format "ip: port"
 
-            return Either.right(Pair.of(ip, port));
+              // expected ip:port
+              var ip = resValue.split(":")[0];
+              var port = Integer.parseInt(resValue.split(":")[1]);
+
+              return Either.right(Pair.of(ip, port));
+            } else {
+              // res should be an error message
+              return Either.left(resValue);
+            }
+
           } catch (Exception e) {
             e.printStackTrace();
             return Either.left(e.getMessage());
@@ -310,7 +323,7 @@ public class ClientMain {
                 }
 
                 var received = new String(dp.getData(), dp.getOffset(), dp.getLength());
-                System.out.println("push notification: " + received);
+                System.out.println("push notification: " + received + "\n> ");
 
               }
 

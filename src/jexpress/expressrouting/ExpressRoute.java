@@ -147,7 +147,6 @@ public class ExpressRoute {
                 path = "";
             }
 
-            // TODO: Can Prefix be null? or empty?
             boolean partial = !isEmpty(prefix) && !isEmpty(next) && !Objects.equals(next, prefix);
             boolean repeat = (Objects.equals(modifier, "+")) || (Objects.equals(modifier, "*"));
             boolean optional = Objects.equals(modifier, "?") || Objects.equals(modifier, "*");

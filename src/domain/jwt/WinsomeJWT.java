@@ -15,6 +15,8 @@ public class WinsomeJWT {
   private WinsomeJWT(String jwt) {
   }
 
+  // create a jwt containing the username as a clain
+  // using the HMAC256 algorithm and the provided secret
   public static String createJWT(String secret, String username) {
     var algorithm = Algorithm.HMAC256(secret);
 
@@ -31,6 +33,8 @@ public class WinsomeJWT {
     return jwt;
   }
 
+  // validate a jwt
+  // using the HMAC256 algorithm and the provided secret
   public static Either<String, User> validateJWT(String secret, String jwt) {
 
     var toRet = Either.<String, User>right(null);
@@ -44,6 +48,7 @@ public class WinsomeJWT {
 
       var usernameClaim = dec.getClaim("username");
 
+      // the username is mandatory to identify the user
       if (usernameClaim.isNull()) {
         throw new RuntimeException();
       }
@@ -62,6 +67,7 @@ public class WinsomeJWT {
     return toRet;
   }
 
+  // extract the username claim from a jwt
   public static Either<String, String> extractUsernameFromJWT(String jwt) {
 
     var toRet = Either.<String, String>right("");
@@ -89,7 +95,7 @@ public class WinsomeJWT {
   }
 
   public static Either<String, String> wrapWithMessageJSON(String jwt, String message) {
-    if (jwt == null || message == "") {
+    if (jwt == null || message == null) {
       return Either.left("cannot wrap jwt because of null arguments");
     } else {
       return Either.right("{\"jwt\":\"" + jwt + "\",\"message\":\"" + message + "\"}");

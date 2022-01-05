@@ -9,7 +9,6 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.CompletableFuture;
 
-import domain.constant.Constant;
 import domain.feedback.Feedback;
 import http.HttpConstants;
 import http.HttpRequest;
@@ -103,7 +102,7 @@ public class Server implements Runnable {
     var toRet = -1;
 
     // the index of the first carriage return if the CR LF CR LF sequence is present
-    var separatorIndex = clientCtx.requestBufferContains(Constant.CRLFx2Byte);
+    var separatorIndex = clientCtx.requestBufferContains(HttpConstants.CRLFx2Byte);
 
     // CR LF CR LF sequence was found
     if (separatorIndex != -1) {

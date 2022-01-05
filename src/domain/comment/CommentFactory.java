@@ -14,10 +14,12 @@ public class CommentFactory {
 
   private static CommentValidator validator = new CommentValidator() {
     @Override
+    // validate a comment
     public Validation<Seq<String>, Comment> validateComment(String text, String postUuid, String author) {
-      return Validation.combine(validateText(text), validatePostUuid(postUuid), validateUsername(author)).ap(Comment::of);
+      return Validation.combine(validateText(text), validatePostUuid(postUuid), validateAuthor(author)).ap(Comment::of);
     }
 
+    // validate the text
     private Validation<String, String> validateText(String text) {
       var errorMessage = "";
       var textTrimmed = text != null ? text.trim().replaceAll("\n|\r|\r\n", "") : null;
@@ -30,6 +32,7 @@ public class CommentFactory {
       return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(textTrimmed);
     }
 
+    // validate the reference to the post
     private Validation<String, String> validatePostUuid(String postUuid) {
       var errorMessage = "";
       var postUuidTrimmed = postUuid != null ? postUuid.trim() : null;
@@ -42,7 +45,8 @@ public class CommentFactory {
       return !errorMessage.equals("") ? Validation.invalid(errorMessage) : Validation.valid(postUuidTrimmed);
     }
 
-    private Validation<String, String> validateUsername(String author) {
+    // validate the author
+    private Validation<String, String> validateAuthor(String author) {
       var errorMessage = "";
       var authorTrimmed = author != null ? author.trim() : null;
 
@@ -56,6 +60,7 @@ public class CommentFactory {
 
   };
 
+  // try to create a Comment instance, collect each error if any
   public static Validation<Seq<String>, Comment> create(String text, String postUuid, String author) {
     return validator.validateComment(text, postUuid, author);
   }

@@ -26,6 +26,7 @@ public class HttpConstants {
   public static final String PATCH = "PATCH";
   public static final String DELETE = "DELETE";
   public static final String OPTIONS = "OPTIONS";
+  public static final byte[] CRLFx2Byte = new byte[] { 0x0D, 0x0A, 0x0D, 0x0A };
 
   private HttpConstants() {
   }

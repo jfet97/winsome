@@ -18,6 +18,7 @@ public class HttpResponse {
   private HttpResponse() {
   }
 
+  // build an instance of a HttpResponse
   public static Either<String, HttpResponse> build(String HTTPVersion, String statusCode, String reasonPhrase) {
     HttpResponse instance = new HttpResponse();
     var errorMessage = "";
@@ -41,6 +42,7 @@ public class HttpResponse {
     }
   }
 
+  // parse a string into a HttpResponse
   public static Either<String, HttpResponse> parse(String response) {
     var instance = new HttpResponse();
     var errorMessage = "";
@@ -60,7 +62,6 @@ public class HttpResponse {
         instance.reasonPhrase = responseLineEntries[2];
 
         // parse headers
-
         Arrays.stream(responseBeforeBodyEntries).skip(1).forEach(header -> {
           var keyValue = header.split(": ");
           instance.headers.put(keyValue[0], keyValue[1]);
@@ -123,6 +124,7 @@ public class HttpResponse {
   }
 
   @Override
+  // serialize into a string
   public String toString() {
 
     var response = this.HTTPVersion + " " + this.statusCode + " " + this.reasonPhrase + HttpConstants.CRLF;
@@ -159,7 +161,7 @@ public class HttpResponse {
     return this.body;
   }
 
-  // builders
+  // useful builders
   private static Either<String, HttpResponse> buildFromCode(String bodyN, String mime, Boolean keepAliveConnection,
       String[] code) {
     String body = bodyN != null ? bodyN : "";
@@ -190,7 +192,6 @@ public class HttpResponse {
 
   public static Either<String, HttpResponse> build400(String bodyN, String mime, Boolean keepAliveConnection) {
     return buildFromCode(bodyN, mime, keepAliveConnection, HttpConstants.BAD_REQUEST_400);
-
   }
 
   public static Either<String, HttpResponse> build401(String bodyN, String mime, Boolean keepAliveConnection) {

@@ -6,7 +6,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-
 import io.vavr.control.Either;
 
 public class HttpRequest {
@@ -22,6 +21,7 @@ public class HttpRequest {
   private HttpRequest() {
   }
 
+  // build an instance of HttpRequest
   public static Either<String, HttpRequest> build(String method) {
     HttpRequest instance = new HttpRequest();
     var errorMessage = "";
@@ -53,6 +53,7 @@ public class HttpRequest {
     }
   }
 
+  // parse a string into a HttpRequest
   public static Either<String, HttpRequest> parse(String request) {
     var instance = new HttpRequest();
     var errorMessage = "";
@@ -206,6 +207,7 @@ public class HttpRequest {
   }
 
   @Override
+  // serialize into a string
   public String toString() {
 
     var request = this.method + " " + this.requestTarget + " " + this.HTTPVersion + HttpConstants.CRLF;
@@ -252,7 +254,7 @@ public class HttpRequest {
     return this.body;
   }
 
-  // static utilities
+  // useful builders
   public static Either<String, HttpRequest> buildPostRequest(String requestTarget, String body,
       Map<String, String> headers) {
 

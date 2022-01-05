@@ -26,7 +26,9 @@ public class JExpress {
   private final String DELETE = HttpConstants.DELETE;
   private final String OPTIONS = HttpConstants.OPTIONS;
 
+  // routes handlers
   private final Map<String, Map<ExpressRoute, TriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>>>> routes = new HashMap<>();
+  // global middlewares that act before the above handlers
   private final List<QuadriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>, Runnable>> globalMiddlewares = new LinkedList<>();
 
   public JExpress() {
@@ -51,7 +53,7 @@ public class JExpress {
     this.globalMiddlewares.add(middleware);
   }
 
-  // callback registration
+  // handlers registration
   private void add(ExpressRoute route, String method,
       TriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>> cb) {
     this.routes.get(method).put(route, cb);
@@ -96,6 +98,9 @@ public class JExpress {
   // -------------------------------------------------
   // requests handling
 
+  // run the middleware in order
+  // a middleware run only if it is the first or the previous middleware has
+  // called the next callback
   private void runMiddlewares(HttpRequest request, Map<String, String> parametersFromPath,
       List<QuadriConsumer<HttpRequest, Map<String, String>, Consumer<Either<String, HttpResponse>>, Runnable>> middlewares,
       Integer index, Wrapper<Boolean> runRouteHandler, Wrapper<Either<String, HttpResponse>> resWrapper) {
@@ -112,6 +117,7 @@ public class JExpress {
         // set this response to be returned
         // (it will be returned unless a following middleware overwrites it)
         resWrapper.value = response;
+        // the next callback
       }, () -> runMiddlewares(request, parametersFromPath, middlewares, index + 1, runRouteHandler, resWrapper));
 
     } catch (IndexOutOfBoundsException e) {
@@ -146,6 +152,7 @@ public class JExpress {
             var handler = entry.getValue();
 
             if (route.matches(target)) {
+              // extract query parameters
               var parametersFromPath = route.getParametersFromPath(target);
               var runRouteHandler = Wrapper.of(false);
 
@@ -156,13 +163,12 @@ public class JExpress {
               // next callback
               if (runRouteHandler.value) {
                 handler.accept(request, parametersFromPath, eresponse -> {
-
+                  // if something went wrong, return a 500
                   var response = eresponse
                       .recoverWith(err -> HttpResponse.build500(
                           Feedback.error(
                               ToJSON.toJSON(err)).toJSON(),
                           HttpConstants.MIME_APPLICATION_JSON, true));
-
                   resWrapper.value = response;
                 });
               }

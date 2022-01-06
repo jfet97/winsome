@@ -487,6 +487,35 @@ public class ServerMain {
       reply.accept(toRet);
     });
 
+    // get a user by its id
+    jexpress.get(USERS_ROUTE + "/:user_id", (req, params, reply) -> {
+
+      var toRet = Either.<String, HttpResponse>right(null);
+
+      try {
+        // extract the user from the context
+        var user = (User) req.context;
+
+        // try to list the users and reply accordingly with the result of the operation
+        toRet = winsome
+            .getUser(user.username)
+            .flatMap(u -> HttpResponse.build200(
+                Feedback.right(u.toJSON(false)).toJSON(),
+                HttpConstants.MIME_APPLICATION_JSON, true))
+            .recoverWith(err -> HttpResponse.build400(
+                Feedback.error(ToJSON.toJSON(err)).toJSON(),
+                HttpConstants.MIME_APPLICATION_JSON, true));
+
+      } catch (Exception e) {
+        // something really bad has happened, jexpress will return a 500
+        e.printStackTrace();
+        toRet = Either.left(e.getMessage());
+      }
+
+      // reply to the requestor
+      reply.accept(toRet);
+    });
+
     // get a list of users with at least one common tag with the requestor
     jexpress.get(USERS_ROUTE, (req, params, reply) -> {
 
@@ -534,7 +563,7 @@ public class ServerMain {
       // reply to the requestor
       reply.accept(toRet);
     });
-
+  
     // get a list of users which follows the requestor
     jexpress.get(USERS_ROUTE + "/:user_id" + FOLLOWERS_ROUTE, (req, params, reply) -> {
 

@@ -89,6 +89,10 @@ public class User {
   }
 
   public String toJSON() {
+    return this.toJSON(true);
+  }
+
+  public String toJSON(Boolean includePassword) {
 
     var tagsLine = "\"tags\":[";
     tagsLine += this.tags
@@ -125,7 +129,7 @@ public class User {
     return String.join("",
         "{",
         "\"username\":" + "\"" + this.username + "\"" + ",",
-        "\"password\":" + "\"" + this.password + "\"" + ",",
+        includePassword ? "\"password\":" + "\"" + this.password + "\"" + "," : "",
         tagsLine + ",",
         postsLine + ",",
         followersLine + ",",

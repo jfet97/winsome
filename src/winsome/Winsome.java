@@ -236,6 +236,15 @@ public class Winsome {
         });
   }
 
+  // get a user given its username if the argument is valid
+  // or an error in the form of a string if not
+  public Either<String, User> getUser(String username) {
+    return nullGuard(username, "username")
+        // extract the user by its username
+        .flatMap(__ -> Either.<String, User>right(network.get(username)))
+        .flatMap(user -> user == null ? Either.left("unknown user") : Either.right(user));
+  }
+
   // do a synchronized action on the set of followers of a user
   public void synchronizedActionOnFollowersOfUser(String username, Consumer<List<String>> cb) {
     this.network.computeIfPresent(username, (__, user) -> {

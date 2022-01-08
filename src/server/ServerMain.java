@@ -140,7 +140,7 @@ public class ServerMain {
       // json file, an exception will be raised
       toRet.toJSON();
     } catch (Exception e) {
-      e.printStackTrace();
+      System.out.println("Error restoring server state: " + e.getMessage());
       toRet = Winsome.of();
     }
     return toRet;

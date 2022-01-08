@@ -323,7 +323,7 @@ public class ClientMain {
                 }
 
                 var received = new String(dp.getData(), dp.getOffset(), dp.getLength());
-                System.out.println("push notification: " + received + "\n> ");
+                System.out.printf("push notification: " + received + "\n> ");
 
               }
 

@@ -1,6 +1,7 @@
 .vscode
 bin
-**/*.json
+src/**/*.json
+/*.json
 .DS_Store
 *.mp4
 **/*.txt

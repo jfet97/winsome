@@ -1,0 +1,7 @@
+{
+    "auth_token_path": "./token.txt",
+    "remote_registry_port": 7777,
+    "server_ip": "192.168.1.113",
+    "stub_name": "winsome-stub",
+    "tcp_port": 12345
+}

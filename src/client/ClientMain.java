@@ -37,7 +37,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import client.RMI.IRemoteClient;
 import client.RMI.RemoteClient;
 import domain.comment.Comment;
-import domain.jwt.WinsomeJWT;
 import domain.post.Post;
 import domain.reaction.Reaction;
 import domain.user.User;
@@ -50,6 +49,7 @@ import io.vavr.control.Either;
 import server.RMI.IRemoteServer;
 import utils.Pair;
 import utils.TriConsumer;
+import utils.WinsomeJWT;
 import utils.Wrapper;
 
 public class ClientMain {

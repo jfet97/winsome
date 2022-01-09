@@ -80,7 +80,7 @@ public class User {
     }
   }
 
-  // lock the followers to then calling the callback with a clone
+  // lock the followers and then call the callback with a clone
   // of the followers set
   public void synchronizedActionOnFollowers(Consumer<List<String>> cb) {
     synchronized (this.followers) {

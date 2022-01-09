@@ -17,7 +17,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import domain.comment.Comment;
 import domain.feedback.Feedback;
-import domain.jwt.WinsomeJWT;
 import domain.post.Post;
 import domain.reaction.Reaction;
 import domain.user.User;
@@ -30,6 +29,7 @@ import server.RMI.RemoteServer;
 import server.RMI.IRemoteServer;
 import utils.Pair;
 import utils.ToJSON;
+import utils.WinsomeJWT;
 import utils.Wrapper;
 import winsome.Winsome;
 

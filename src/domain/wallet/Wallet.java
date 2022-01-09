@@ -1,22 +1,25 @@
 package domain.wallet;
 
-import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.vavr.control.Either;
 
 public class Wallet {
 
   // ConcurrentMap<username, transactions>
+  @JsonProperty("wallet")
   private final ConcurrentMap<String, List<WalletTransaction>> wallet = new ConcurrentHashMap<>();
 
   // last time the wallet thread has run
-  public Long prevTimestamp = new Date().getTime(); // needs manual synchronization (wallet and persistence threads)
+  @JsonProperty("prevTimestamp")
+  private Long prevTimestamp = new Date().getTime(); // needs manual synchronization (wallet and persistence threads)
 
   public static Wallet of() {
     return new Wallet();
@@ -42,9 +45,30 @@ public class Wallet {
     }
   }
 
-  // return an immutable copy of the concurrent map
-  public Map<String, List<WalletTransaction>> getWallet() {
-    return Collections.unmodifiableMap(this.wallet);
+  // return a deep copy of the wallet of an user
+  public Either<String, List<WalletTransaction>> getWalletOf(String username) {
+    return nullGuard(username, "username")
+        .map(__ -> this.wallet.get(username))
+        .flatMap(ts -> {
+          if (ts != null) {
+
+            // sync with addTransaction
+            synchronized (ts) {
+              return Either.right(ts
+                  .stream()
+                  .map(WalletTransaction::clone)
+                  .collect(Collectors.toList()));
+            }
+            // by returning a clone, we can safely perform
+            // further actions on the list without the need
+            // of the lock, although "the read may not get the latest write"
+            // (eventual consistency)
+
+          } else {
+            return Either.left("unknown user");
+          }
+        });
+
   }
 
   // add a user to the wallet
@@ -68,7 +92,11 @@ public class Wallet {
           var et = WalletTransactionFactory.create(gain)
               .toEither();
 
-          et.forEach(ts::add);
+          // sync with getWalletOf
+          synchronized (ts) {
+            et.forEach(ts::add);
+          }
+
           return et;
         });
   }

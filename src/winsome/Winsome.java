@@ -21,7 +21,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import domain.comment.Comment;
 import domain.comment.CommentFactory;
-import domain.jwt.WinsomeJWT;
 import domain.post.AuthorPostUuid;
 import domain.post.Post;
 import domain.post.PostFactory;
@@ -37,6 +36,7 @@ import utils.HashPassword;
 import utils.Pair;
 import utils.TriConsumer;
 import utils.Triple;
+import utils.WinsomeJWT;
 import utils.Wrapper;
 
 // to ignore JWT_SIGN_SECRET
@@ -143,16 +143,8 @@ public class Winsome {
     return nullGuard(username, "username")
         // extract the user by its username
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
-        .map(user -> this.wallet
-            // get an immutable reference to the internal concurrent hashmap
-            .getWallet()
-            // get the list of transactions fo the user
-            .get(user.username)
-            .stream()
-            // clone each transaction to allow safe updates on them
-            .map(WalletTransaction::clone)
-            // collect them into a list
-            .collect(Collectors.toList()));
+        // return a deep copy of its transactions
+        .flatMap(user -> this.wallet.getWalletOf(user.username));
   }
 
   // delete and return a post if the arguments are valid

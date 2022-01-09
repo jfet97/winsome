@@ -10,9 +10,9 @@ import com.auth0.jwt.exceptions.JWTVerificationException;
 import domain.user.User;
 import io.vavr.control.Either;
 
-public class WinsomeJWT {
+public class JWTUtils {
 
-  private WinsomeJWT(String jwt) {
+  private JWTUtils(String jwt) {
   }
 
   // create a jwt containing the username as a clain

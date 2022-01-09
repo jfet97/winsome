@@ -2,8 +2,6 @@
 
 ## Andrea Simone Costa - 597287
 
-METTI UN MENU
-
 &nbsp;
 
 ### Introduzione
@@ -170,6 +168,13 @@ Questa classe, duale della precedente, espone tutto il necessario per generare u
 
 La classe `HttpConstants` non è istanziabile e ha come unico scopo quello di centralizzare, sotto un namespace comune, le principali costanti che fanno parte del protocollo HTTP, come ad esempio i metodi, i codici di risposta con le corrispondenti reason e i MIME type più comuni.
 
+#### Content-Length header
+
+È doveroso dedicare un paragrafo, e quale sezione migliore per farlo, ad un problema semplice da porre ma leggermente complicato da affrontare: come può il server (client) determinare, in fase di ricezione di una richiesta (risposta) HTTP, la dimensione dell'eventuale body? Lo standard HTTP delinea tutta una serie di indicazioni, delle quali solo una, in particolar modo, è stata riadattata e implementata nel progetto:
+> HTTP/1.1 requests containing a message-body must include a valid Content-Length header field unless the server is known to be HTTP/1.1 compliant. If a request contains a message-body and a Content-Length is not given, the server should respond with 400 (bad request) if it cannot determine the length of the message, or with 411 (length required) if it wishes to insist on receiving a valid Content-Length.
+
+Il server richiede quindi che tutte le richieste HTTP che non siano GET/DELETE/OPTIONS contengano l'header __Content-Length__, in modo tale da poter conoscere esattamente il numero di byte da leggere dopo la sequenza __CR LF CR LF__ segnalante la fine della sezione dedicata. In caso contrario, il server si rifiuta di gestire la richiesta e termina unilateralmente la connessione con il client. Da parte sua, il server imposta sempre tale header in ogni risposta che trasmette al client, in quanto anche esso necessita di sapere la dimensione del body della risposta ricevuta.
+
 &nbsp;
 
 ### JExpress
@@ -227,3 +232,42 @@ Either<String, HttpResponse> eresponse = jexpress.handle(justAnHTTPRequest);
 Internamente, infatti, il framework non fa uso di né di strutture concorrenti né di blocchi `synchronized` né di lock di alcun tipo, in modo tale garantire la massima reattività. Durante la fase di gestione delle richieste tali strutture dati vengono sempre utilizzante in sola lettura; è solo nella fase di configurazione che si presenta la necessità di eseguire operazioni di scrittura.
 
 In conclusione di questa sezione è doveroso ringraziare tale Mark McGuill che, ormai quasi 6 anni fa, ha eseguito il porting da JavaScript a Java di una utility fondamentale per l'esistenza di JExpress. La trasformazione da rotta parametrica, sottoforma di stringa, a regexp in grado di eseguire il matching sui target delle richieste HTTP, e di estrarre eventuali parametri, è possibile grazie al suo prezioso contributo alla comunità opensource, liberamente fruibile su [GitHub](https://github.com/mmcguill/express-routing).
+
+&nbsp;
+
+### Utils
+
+Questa sezione raccoglie varie classi e metodi di utilizzo generale.
+
+
+#### Hasher
+
+Tale classe espone un metodo statico, `hash`, che esegue l'hasing di una stringa utilizzando l'algoritmo SHA-512.
+
+#### JWTUtils
+
+Tale classe espone dei metodi per creare, validare e decodificare i token JWT.
+
+#### Pair
+
+Una generica coppia di oggetti eterogenea.
+
+#### Triple
+
+Una generica tripla di oggetti eterogenea.
+
+### TriConsumer
+
+Una `FunctionalInterface` rappresentante il tipo delle funzioni con tre parametri in ingresso, eventualmente di tre tipi diversi, che restituiscono `void`.
+
+### QuadriConsumer
+
+Una `FunctionalInterface` rappresentante il tipo delle funzioni con quattro parametri in ingresso, eventualmente di quattro tipi diversi, che restituiscono `void`.
+
+### ToJSON
+
+Una classe che provvede metodi statici utili per la conversione in JSON di alcuni tipi primitivi.
+
+### Wrapper
+
+Un banale wrapper che racchiude un qualsiasi tipo di dato. La sua utilità principale è quella di permettere di bypassare alcune semplici limitazioni del linguaggio.

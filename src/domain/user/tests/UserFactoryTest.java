@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 import domain.user.UserFactory;
-import utils.HashPassword;
+import utils.Hasher;
 
 public class UserFactoryTest {
 
@@ -99,7 +99,7 @@ public class UserFactoryTest {
 
     var user = euser.get();
     assertEquals(user.username, "johndoe");
-    assertEquals(user.password, HashPassword.hash("abcde12345"));
+    assertEquals(user.password, Hasher.hash("abcde12345"));
     assertTrue(user.tags.contains("tag1"));
     assertTrue(user.tags.contains("tag2"));
     assertTrue(user.tags.contains("tag3"));
@@ -117,7 +117,7 @@ public class UserFactoryTest {
 
     var user = euser.get();
     assertEquals(user.username, "johndoe");
-    assertEquals(user.password, HashPassword.hash("abcde12345"));
+    assertEquals(user.password, Hasher.hash("abcde12345"));
     assertTrue(user.tags.contains("tag1"));
     assertTrue(user.tags.contains("tag2"));
     assertTrue(user.tags.contains("tag3"));

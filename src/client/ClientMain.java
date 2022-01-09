@@ -49,7 +49,7 @@ import io.vavr.control.Either;
 import server.RMI.IRemoteServer;
 import utils.Pair;
 import utils.TriConsumer;
-import utils.WinsomeJWT;
+import utils.JWTUtils;
 import utils.Wrapper;
 
 public class ClientMain {
@@ -171,7 +171,7 @@ public class ClientMain {
 
       // update username
       JWT = jwt;
-      var eusername = WinsomeJWT.extractUsernameFromJWT(jwt);
+      var eusername = JWTUtils.extractUsernameFromJWT(jwt);
       if (eusername.isLeft()) {
         System.out.println("something went wrong during token refreshing");
 
@@ -222,7 +222,7 @@ public class ClientMain {
       var jwt = Files.readString(path);
       JWT = jwt;
 
-      var eusername = WinsomeJWT.extractUsernameFromJWT(jwt);
+      var eusername = JWTUtils.extractUsernameFromJWT(jwt);
       if (eusername.isLeft()) {
         System.out.println(eusername.getLeft() + ", please login again");
       } else {

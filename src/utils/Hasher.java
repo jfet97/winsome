@@ -3,17 +3,17 @@ package utils;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-public class HashPassword {
-  private HashPassword() {
+public class Hasher {
+  private Hasher() {
   }
 
-  // hash a password using SHA-512
-  public static String hash(String password) {
+  // hash a string using SHA-512
+  public static String hash(String string) {
     try {
 
       var md = MessageDigest.getInstance("SHA-512");
 
-      var bytes = md.digest(password.getBytes());
+      var bytes = md.digest(string.getBytes());
 
       var sb = new StringBuilder();
       for (int i = 0; i < bytes.length; i++) {

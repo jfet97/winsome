@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-import utils.HashPassword;
+import utils.Hasher;
 
 public class HashPasswordTest {
 
@@ -17,7 +17,7 @@ public class HashPasswordTest {
       "123456",
   })
   void sameHash(String password) {
-    assertEquals(HashPassword.hash(password), HashPassword.hash(password));
+    assertEquals(Hasher.hash(password), Hasher.hash(password));
   }
 
   @ParameterizedTest(name = "{0}")
@@ -27,6 +27,6 @@ public class HashPasswordTest {
       "123456",
   })
   void differentHash(String password) {
-    assertNotEquals(HashPassword.hash(password), HashPassword.hash(password + " "));
+    assertNotEquals(Hasher.hash(password), Hasher.hash(password + " "));
   }
 }

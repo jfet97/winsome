@@ -32,11 +32,11 @@ import domain.wallet.Wallet;
 import domain.wallet.WalletTransaction;
 import http.HttpConstants;
 import io.vavr.control.Either;
-import utils.HashPassword;
+import utils.Hasher;
 import utils.Pair;
 import utils.TriConsumer;
 import utils.Triple;
-import utils.WinsomeJWT;
+import utils.JWTUtils;
 import utils.Wrapper;
 
 // to ignore JWT_SIGN_SECRET
@@ -291,21 +291,21 @@ public class Winsome {
         .flatMap(__ -> Either.<String, User>right(network.get(username)))
         .flatMap(user -> user == null ? Either.left("unknown user") : Either.right(user))
         // check the passowrd
-        .flatMap(user -> !HashPassword.hash(password).equals(user.password) ? Either.left("invalid password")
+        .flatMap(user -> !Hasher.hash(password).equals(user.password) ? Either.left("invalid password")
             : Either.right(user))
         .flatMap(user -> {
 
           // create a new jwt and try to store it
-          var newjwt = WinsomeJWT.createJWT(JWT_SIGN_SECRET, username);
+          var newjwt = JWTUtils.createJWT(JWT_SIGN_SECRET, username);
           var currJWT = loggedUsers.putIfAbsent(user.username, newjwt);
 
           // putIfAbsent return null if there was no previous mapping for the key
           if (currJWT == null) {
-            return WinsomeJWT.wrapWithMessageJSON(newjwt, "user successfully logged");
+            return JWTUtils.wrapWithMessageJSON(newjwt, "user successfully logged");
           } else if (forceLogin) {
             // update the user token and send it back
             loggedUsers.put(user.username, newjwt);
-            return WinsomeJWT.wrapWithMessageJSON(newjwt, "user was already logged, previous sessions are now invalid");
+            return JWTUtils.wrapWithMessageJSON(newjwt, "user was already logged, previous sessions are now invalid");
           } else {
             // it is an error
             return Either.left("user seems to be already logged somewhere else");

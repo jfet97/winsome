@@ -29,7 +29,7 @@ import server.RMI.RemoteServer;
 import server.RMI.IRemoteServer;
 import utils.Pair;
 import utils.ToJSON;
-import utils.WinsomeJWT;
+import utils.JWTUtils;
 import utils.Wrapper;
 import winsome.Winsome;
 
@@ -304,7 +304,7 @@ public class ServerMain {
         var jwt = req.getHeaders().get("Authorization").substring(7);
 
         // validate the jwt and extract the user that made the reqeust from it
-        var euser = WinsomeJWT
+        var euser = JWTUtils
             .validateJWT(jwtSecret, jwt)
             .flatMap(user -> winsome
                 .getUserJWT(user.username)

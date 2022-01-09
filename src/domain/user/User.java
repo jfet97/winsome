@@ -9,7 +9,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import domain.post.Post;
-import utils.HashPassword;
+import utils.Hasher;
 
 public class User {
   public String username;
@@ -23,7 +23,7 @@ public class User {
     var instance = new User();
 
     instance.username = username; // readonly
-    instance.password = hashPassword ? HashPassword.hash(password) : password; // readonly
+    instance.password = hashPassword ? Hasher.hash(password) : password; // readonly
     instance.tags = tags; // readonly
     instance.posts = new ConcurrentHashMap<String, Post>();
     instance.followers = new HashSet<String>(); // needs manual synchronization

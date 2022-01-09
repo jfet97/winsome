@@ -2,7 +2,7 @@ package utils;
 
 import java.util.Collection;
 
-// utility to convert into json some values
+// utility to convert into json some primitive values
 public class ToJSON {
   private ToJSON() {
   }

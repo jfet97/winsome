@@ -6,7 +6,7 @@
 
 ### Introduzione
 
-Sperimentare. La parola chiave dell'intero progetto è "sperimentare", l'obiettivo principale che ha guidato ogni singola scelta durante lo svolgimento della consegna. Si vorrebbe poter sostenere che il seguire questa filosofia abbia portato a svolgere un buon lavoro, ma in realtà l'unico attributo positivo che l'autore sente di poter accostare con un pizzico di immodestia al prodotto finale è "interessante". La lista delle caratteristiche negative, ahimè, è piuttosto prolissa invece.
+Il principio cardine dell'intero progetto, l'obiettivo principale che ha guidato ogni singola scelta durante lo svolgimento della consegna, è stato quello di voler sperimentare diverse tecniche e tecnologie, molteplici approcci per risolvere il medesimo problema, varie soluzioni alternatice. Si vorrebbe poter sostenere che il seguire questa filosofia abbia portato a svolgere un buon lavoro, ma in realtà l'unico attributo positivo che l'autore sente di poter accostare con un pizzico di immodestia al prodotto finale è "interessante". La lista delle caratteristiche negative, ahimè, è piuttosto prolissa invece.
 
 Pragmaticamente parlando, l'architettura generale si avvicina a quella di un applicativo web moderno. Il server espone delle - alquanto approssimative - REST API, dialoga utilizzando principalmente il protocollo HTTP, come formato di interscambio per i dati si serve del JSON (JavaScript's SON) e impiega token JWT (JSON Web Token) per l'autenticazione e l'autorizzazione degli utenti. La gestione dei client, a più basso livello, è stata demandata a NIO e alle sue peculiarità basate sul multiplexing dei canali. Salendo di qualche livello di astrazione troviamo JExpress (Java Express, o caffè espresso per gli amici), un "framework" per la costruzione di applicazioni web creato da zero per l'occasione e fortemente ispirato al ben più famoso e meglio riuscito Express.js. La CLI, fornita come prima implementazione di un client come da specifica, è invece piuttosto semplicistica, non particolarmente brillante, specialmente per ragioni di tempo, ma in grado di comunicare perfettamente con il server. È stato progettato e implementato, con alcune limitazioni, anche un altro tipo di client: un applicativo frontend eseguibile su un qualsiasi browser.
 
@@ -16,7 +16,7 @@ Il software è stato scritto, nella sua interezza, adoperando il Java SE Develop
 
 ### Concetti base
 
-Si è ritenuto necessario dedicare un piccolo spazio ad una spiegazione veloce, ma essenziale, di alcuni aspetti del progetto che potrebbero risultare non familiari agli esaminatori.
+Si è ritenuto necessario dedicare un piccolo spazio ad una spiegazione veloce, ma essenziale, di alcuni aspetti del progetto che potrebbero risultare non familiari a eventuali lettori.
 
 #### Either<E, A>
 
@@ -62,7 +62,7 @@ La modellazione degli errori non è però l'unico scopo per cui esiste l'`Either
 
 #### Validation<E, A>
 
-Il tipo `Validation` ha delle similarità con il tipo `Either`, ma non possiede lo stesso potere dal punto di vista della ocmposizione. Il prezzo si paga in favore di una necessità profondamente diversa per quanto riguarda il caso di errore, ovvero la possibilità di eseguire comunque delle computazioni, possibilmente in parallelo, nonostante alcune possano fallire, in modo da poter raccogliere il numero più elevato di errori possibile. Il nome di questo tipo è emblematico, infatti esso è spesso utilizzato per modellare controlli di validità su strutture aventi dipendenze esterne, come ad esempio istanze derivanti dalla deserializzazione del JSON ottenuto in base all'input inserito da un operatore umano in un form.
+Il tipo `Validation` ha delle similarità con il tipo `Either`, ma non possiede lo stesso potere dal punto di vista della composizione. Il prezzo si paga in favore di una necessità profondamente diversa per quanto riguarda il caso di errore, ovvero la possibilità di eseguire comunque delle computazioni, possibilmente in parallelo, nonostante alcune possano fallire, in modo da poter raccogliere il numero più elevato di errori possibile. Il nome di questo tipo è emblematico, infatti esso è spesso utilizzato per modellare controlli di validità su strutture aventi dipendenze esterne, come ad esempio istanze derivanti dalla deserializzazione del JSON ottenuto in base all'input inserito da un operatore umano in un form.
 
 Per poter combinare tra loro i possibili errori durante l'esecuzione delle computazioni, poiché essi potrebbero avere un qualunque tipo `E`, purché sia il medesimo tra tutti essi, la strategia più comune consiste nella loro raccolta in una qualche sequenza, come ad esempio una lista o un array, posticipando completamente la loro gestione. Se infatti è piuttosto chiaro come due istanze di `String` possano essere combinate, lo è molto meno nel caso di due `RuntimeException`. In generale spetterà quindi al client della validazione la decisione sul da farsi coi possibili errori incontrati. Questa tecnica ha un nome preciso per gli adetti ai lavori, si tratta di sfruttare il monoide libero su `E`.
 
@@ -133,6 +133,8 @@ La classe `User` rappresenta gli utenti del social network. Ogni utente possiede
 
 I medesimi ragionamenti che hanno influito sulle scelte prese nella classe `Post` sono presenti nella classe `User`. Ad esempio, un thread può rimuovere un follower mentre altri thread eseguono diverse operazioni su diversi post, specialmente grazie alle proprietà del tipo di hashmap scelta. Anche le conseguenze, dal punto di vista della consistenza, sono condivise con quelle della classe `Post`.
 
+Si osservi la presenza del metodo `synchronizedActionOnFollowers`, il quale accetta una callback per operare in sola lettura e in mutua esclusione sui follower di un utente. Esso si rivela molto utile per recuperare in fase di login di un utente la lista degli utenti che attualmente lo seguono.
+
 Infine, è presente una `UserFactory` per la creazione sicura basata su validazioni, dove necessario, di istanze di tipo `User`.
 
 #### UserTags
@@ -173,7 +175,7 @@ La classe `HttpConstants` non è istanziabile e ha come unico scopo quello di ce
 È doveroso dedicare un paragrafo, e quale sezione migliore per farlo, ad un problema semplice da porre ma leggermente complicato da affrontare: come può il server (client) determinare, in fase di ricezione di una richiesta (risposta) HTTP, la dimensione dell'eventuale body? Lo standard HTTP delinea tutta una serie di indicazioni, delle quali solo una, in particolar modo, è stata riadattata e implementata nel progetto:
 > HTTP/1.1 requests containing a message-body must include a valid Content-Length header field unless the server is known to be HTTP/1.1 compliant. If a request contains a message-body and a Content-Length is not given, the server should respond with 400 (bad request) if it cannot determine the length of the message, or with 411 (length required) if it wishes to insist on receiving a valid Content-Length.
 
-Il server richiede quindi che tutte le richieste HTTP che non siano GET/DELETE/OPTIONS contengano l'header __Content-Length__, in modo tale da poter conoscere esattamente il numero di byte da leggere dopo la sequenza __CR LF CR LF__ segnalante la fine della sezione dedicata. In caso contrario, il server si rifiuta di gestire la richiesta e termina unilateralmente la connessione con il client. Da parte sua, il server imposta sempre tale header in ogni risposta che trasmette al client, in quanto anche esso necessita di sapere la dimensione del body della risposta ricevuta.
+Il server richiede quindi che tutte le richieste HTTP che non siano GET/DELETE/OPTIONS contengano l'header __Content-Length__, in modo tale da poter conoscere esattamente il numero di byte da leggere dopo la sequenza __CR LF CR LF__ segnalante la fine della sezione dedicata agli header. In caso contrario, il server si rifiuta di gestire la richiesta e termina unilateralmente la connessione con il client. Da parte sua, il server imposta sempre tale header in ogni risposta che trasmette al client, in quanto anche esso necessita di sapere la dimensione del body della risposta ricevuta.
 
 &nbsp;
 
@@ -231,7 +233,7 @@ Either<String, HttpResponse> eresponse = jexpress.handle(justAnHTTPRequest);
 
 Internamente, infatti, il framework non fa uso di né di strutture concorrenti né di blocchi `synchronized` né di lock di alcun tipo, in modo tale garantire la massima reattività. Durante la fase di gestione delle richieste tali strutture dati vengono sempre utilizzante in sola lettura; è solo nella fase di configurazione che si presenta la necessità di eseguire operazioni di scrittura.
 
-In conclusione di questa sezione è doveroso ringraziare tale Mark McGuill che, ormai quasi 6 anni fa, ha eseguito il porting da JavaScript a Java di una utility fondamentale per l'esistenza di JExpress. La trasformazione da rotta parametrica, sottoforma di stringa, a regexp in grado di eseguire il matching sui target delle richieste HTTP, e di estrarre eventuali parametri, è possibile grazie al suo prezioso contributo alla comunità opensource, liberamente fruibile su [GitHub](https://github.com/mmcguill/express-routing).
+In conclusione di questa sezione è doveroso ringraziare tale Mark McGuill che, ormai quasi 6 anni fa, ha eseguito il porting da JavaScript a Java di una utility fondamentale per l'esistenza di JExpress. La trasformazione da rotta parametrica, sottoforma di stringa, a regexp in grado di eseguire il matching sui target delle richieste HTTP, e di estrarre eventuali parametri, è possibile grazie al suo prezioso contributo alla comunità opensource, liberamente fruibile al seguente indirizzo: [https://github.com/mmcguill/express-routing](https://github.com/mmcguill/express-routing).
 
 &nbsp;
 
@@ -256,18 +258,38 @@ Una generica coppia di oggetti eterogenea.
 
 Una generica tripla di oggetti eterogenea.
 
-### TriConsumer
+#### TriConsumer
 
 Una `FunctionalInterface` rappresentante il tipo delle funzioni con tre parametri in ingresso, eventualmente di tre tipi diversi, che restituiscono `void`.
 
-### QuadriConsumer
+#### QuadriConsumer
 
 Una `FunctionalInterface` rappresentante il tipo delle funzioni con quattro parametri in ingresso, eventualmente di quattro tipi diversi, che restituiscono `void`.
 
-### ToJSON
+#### ToJSON
 
 Una classe che provvede metodi statici utili per la conversione in JSON di alcuni tipi primitivi.
 
-### Wrapper
+#### Wrapper
 
 Un banale wrapper che racchiude un qualsiasi tipo di dato. La sua utilità principale è quella di permettere di bypassare alcune semplici limitazioni del linguaggio.
+
+&nbsp;
+
+### Winsome
+
+La classe winsome è il cuore pulsante dell'intero progetto, poiché contiene tutto il necessario per il controllo pratico del social network.
+
+La struttura dati principale è una `ConcurrentMap<String, User>` contenente l'associazione `username -> User`. Essa è il social network, poiché contiene ogni utente registrato. Una volta ottenuto il riferimento ad un utente è possibile accedere direttamente ad ogni suo post in quanto, ricordiamo, i post sono direttamente referenziati nella classe `User`.\
+Troviamo inoltre una `ConcurrentMap<String, String>` contenente l'associazione `username -> JWT`, ad indicare quali utenti sono "loggati" e quale è il token JWT corrispondente. Per velocizzare l'accesso ad un post, dato il suo id, è risultata sufficiente una sola `ConcurrentMap<String, String>` ridondante, la quale contiene l'associazione `post uuid -> username autore`. Infine è presente una reference al `wallet` contenente il portafogli di ogni utente.\
+Si osservi anche la possibilità di impostare una callback che verrà invocata ogniqualvolta il set di followers di un utente viene modificato.
+
+Per quanto riguarda la gestione della concorrenza, si fa perno sulle proprietà concorrenti delle hashmap elencate sopra ogni volta che è possibile, tenendo anche in considerazione un'invariante importante: nessun utente registrato può disiscriversi dal social network. In altre occasioni si è reso necessario un controllo più fine, principalmente nel caso in cui ci si è trovati a dover apportare modifiche ai set dei followers/following di un utente, o nel caso in cui un post debba essere eliminato e/o "rewinnato". In generale, si punta a serializzare il meno possibile le varie operazioni, sebbene ciò, nuovamente, porti inevitabilmente a scontrarsi con l'eventual consistency.
+
+Una precisazione importante. In varie parti del codice sono presenti istruzioni, improntate alla lettura dei dati, come `aConcurrentMap.entrySet().stream()` oppure `aListOrASet.stream()`, ed è inevitabile chiedersi se tali operazioni sono safe da un punto di vista della concorrenza.\
+Per quanto riguarda il primo caso la risposta è sempre affermativa, in quanto l'iterazione sull'entry set di una struttura concorrente è priva del rischio di incorrere nella spiacevole `ConcurrentModificationException`, al prezzo del rischio di non incontrare eventuali elementi aggiunti alla struttura dopo l'inizio dell'iterazione.\
+Nel caso di strutture non concorrenti, la questione è leggermente più delicata. Ottenere uno stream, come già accennato, è una operazione che ha molto in comune con il processo di iterazione messo a disposizione dal linguaggio. Se tale struttura venisse modificata durante l'uso dello stream, si potrebbero incontrare spiacevoli conseguenze. Ecco perché la strategia adottata, specialmente evidente nelle classi `User` e `Post`, è quella di restituire una shallow copy della struttura dati creata in mutua esclusione. Tale copia non rifletterà eventuali modifiche apportate alla struttura dati originale, ma potrà essere iterata in totale sicurezza.
+
+Per quanto riguarda i dati contenuti all'interno di tali strutture, varie sono le situazioni nelle quali si può incorrere. L'accesso concorrente a dati che sappiamo essere di sola lettura può avvenire senza alcun tipo di problema, mentre in altri casi si è reso necessario acquisire delle lock più granulari. Fuori dalla classe Winsome l'operazione principale che viene effettuata su tali contenuti è la trasformazione in formato JSON; tale trasformazione si basa su due metodi esposti dalle classi in gioco che si preoccupano di acquisire le lock necessarie quando è strettamente necessario.
+
+Per quanto riguarda la persistenza dei dati e l'aggiornamento dei portafogli entrano in gioco due metodi in particolare, `makePersistenceRunnable` e `makeWalletRunnable`, i quali permettodo di configurare e restituiscono dei `Runnable` che si occuperanno, rispettivamente, della persistenza e dei portafogli. Per semplicità i dati dell'intero social, portafogli compresi, vengono periodicamente memorizzati in un unico file, il cui path è configurabile nelle impostazioni del server, in formato JSON.

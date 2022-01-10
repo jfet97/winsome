@@ -56,6 +56,8 @@ public class Wallet {
             synchronized (ts) {
               return Either.right(ts
                   .stream()
+                  // deep clone to allow future updates
+                  // without affecting the original data
                   .map(WalletTransaction::clone)
                   .collect(Collectors.toList()));
             }

@@ -290,7 +290,7 @@ public class Server implements Runnable {
 
       // shared, fixed buffer between requests
       // (safe because NIO input reading is single-threaded)
-      var buf = ByteBuffer.allocate(16384);
+      var buf = ByteBuffer.allocate(4096);
 
       while (true) {
         try {

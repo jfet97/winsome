@@ -563,7 +563,7 @@ public class ServerMain {
       // reply to the requestor
       reply.accept(toRet);
     });
-  
+
     // get a list of users which follows the requestor
     jexpress.get(USERS_ROUTE + "/:user_id" + FOLLOWERS_ROUTE, (req, params, reply) -> {
 

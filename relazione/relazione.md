@@ -6,7 +6,7 @@
 
 ### Introduzione
 
-Il principio cardine dell'intero progetto, l'obiettivo principale che ha guidato ogni singola scelta durante lo svolgimento della consegna, è stato quello di voler sperimentare diverse tecniche e tecnologie, molteplici approcci per risolvere il medesimo problema, varie soluzioni alternatice. Si vorrebbe poter sostenere che il seguire questa filosofia abbia portato a svolgere un buon lavoro, ma in realtà l'unico attributo positivo che l'autore sente di poter accostare con un pizzico di immodestia al prodotto finale è "interessante". La lista delle caratteristiche negative, ahimè, è piuttosto prolissa invece.
+Il principio cardine dell'intero progetto, l'obiettivo principale che ha guidato ogni singola scelta durante lo svolgimento della consegna, è stato quello di voler sperimentare diverse tecniche e tecnologie, molteplici approcci per risolvere il medesimo problema, varie soluzioni alternative. Si vorrebbe poter sostenere che il seguire questa filosofia abbia portato a svolgere un buon lavoro, ma in realtà l'unico attributo positivo che l'autore sente di poter accostare con un pizzico di immodestia al prodotto finale è "interessante". La lista delle caratteristiche negative, ahimè, è piuttosto prolissa invece.
 
 Pragmaticamente parlando, l'architettura generale si avvicina a quella di un applicativo web moderno. Il server espone delle - alquanto approssimative - REST API, dialoga utilizzando principalmente il protocollo HTTP, come formato di interscambio per i dati si serve del JSON (JavaScript's SON) e impiega token JWT (JSON Web Token) per l'autenticazione e l'autorizzazione degli utenti. La gestione dei client, a più basso livello, è stata demandata a NIO e alle sue peculiarità basate sul multiplexing dei canali. Salendo di qualche livello di astrazione troviamo JExpress (Java Express, o caffè espresso per gli amici), un "framework" per la costruzione di applicazioni web creato da zero per l'occasione e fortemente ispirato al ben più famoso e meglio riuscito Express.js. La CLI, fornita come prima implementazione di un client come da specifica, è invece piuttosto semplicistica, non particolarmente brillante, specialmente per ragioni di tempo, ma in grado di comunicare perfettamente con il server. È stato progettato e implementato, con alcune limitazioni, anche un altro tipo di client: un applicativo frontend eseguibile su un qualsiasi browser.
 
@@ -75,7 +75,7 @@ La documentazione, raggiungibile seguendo il link [https://jwt.io/introduction](
 
 Un JWT è codificato utilizzando il formato __Base64url__ ed solitamente costruito da tre componenti: un header, un  payload e la signature:
 
-```
+```java
 xxxxx.yyyyy.zzzzz
 ```
 
@@ -188,21 +188,21 @@ Vediamo un esempio, nel quale viene impostato un handler per la gestione della r
 ```java
 jexpress.post("/users/:user_id", (request, params, reply) -> {
 
-      assertTrue(request instanceof HttpRequest);
+  assertTrue(request instanceof HttpRequest);
 
-      assertTrue(params.containsKey("user_id"));
+  assertTrue(params.containsKey("user_id"));
 
-      var response = HttpResponse.build(HttpConstants.HTTPV11, HttpConstants.OK_200[0], HttpConstants.OK_200[1])
-          .flatMap(req -> req.setHeader("Server", "nginx/0.8.54"))
-          .flatMap(req -> req.setHeader("Date", "02 Jan 2012 02:33:17 GMT"))
-          .flatMap(req -> req.setHeader("Content-Type", "text/html"))
-          .flatMap(req -> req.setHeader("Connection", "Keep-Alive"))
-          .flatMap(req -> req
-              .setBody("<!DOCTYPE html><html><body><h1>User " + params.get("user_id") + "</h1></body></html>"));
+  var response = HttpResponse.build(HttpConstants.HTTPV11, HttpConstants.OK_200[0], HttpConstants.OK_200[1])
+      .flatMap(req -> req.setHeader("Server", "nginx/0.8.54"))
+      .flatMap(req -> req.setHeader("Date", "02 Jan 2012 02:33:17 GMT"))
+      .flatMap(req -> req.setHeader("Content-Type", "text/html"))
+      .flatMap(req -> req.setHeader("Connection", "Keep-Alive"))
+      .flatMap(req -> req
+          .setBody("<!DOCTYPE html><html><body><h1>User " + params.get("user_id") + "</h1></body></html>"));
 
-      reply.accept(response);
+  reply.accept(response);
 
-    });
+});
 ```
 
 L'handler prende in ingresso tre parametri:
@@ -240,7 +240,6 @@ In conclusione di questa sezione è doveroso ringraziare tale Mark McGuill che, 
 ### Utils
 
 Questa sezione raccoglie varie classi e metodi di utilizzo generale.
-
 
 #### Hasher
 
@@ -290,6 +289,70 @@ Una precisazione importante. In varie parti del codice sono presenti istruzioni,
 Per quanto riguarda il primo caso la risposta è sempre affermativa, in quanto l'iterazione sull'entry set di una struttura concorrente è priva del rischio di incorrere nella spiacevole `ConcurrentModificationException`, al prezzo del rischio di non incontrare eventuali elementi aggiunti alla struttura dopo l'inizio dell'iterazione.\
 Nel caso di strutture non concorrenti, la questione è leggermente più delicata. Ottenere uno stream, come già accennato, è una operazione che ha molto in comune con il processo di iterazione messo a disposizione dal linguaggio. Se tale struttura venisse modificata durante l'uso dello stream, si potrebbero incontrare spiacevoli conseguenze. Ecco perché la strategia adottata, specialmente evidente nelle classi `User` e `Post`, è quella di restituire una shallow copy della struttura dati creata in mutua esclusione. Tale copia non rifletterà eventuali modifiche apportate alla struttura dati originale, ma potrà essere iterata in totale sicurezza.
 
-Per quanto riguarda i dati contenuti all'interno di tali strutture, varie sono le situazioni nelle quali si può incorrere. L'accesso concorrente a dati che sappiamo essere di sola lettura può avvenire senza alcun tipo di problema, mentre in altri casi si è reso necessario acquisire delle lock più granulari. Fuori dalla classe Winsome l'operazione principale che viene effettuata su tali contenuti è la trasformazione in formato JSON; tale trasformazione si basa su due metodi esposti dalle classi in gioco che si preoccupano di acquisire le lock necessarie quando è strettamente necessario.
+Per quanto riguarda i dati contenuti all'interno di tali strutture, varie sono le situazioni nelle quali si può incorrere. L'accesso concorrente a dati che sappiamo essere di sola lettura può avvenire senza alcun tipo di problema, mentre in altri casi si è reso necessario acquisire delle lock più granulari. Fuori dalla classe Winsome l'operazione principale che viene effettuata su tali contenuti è la trasformazione in formato JSON; tale trasformazione si basa su due metodi esposti dalle classi in gioco che si preoccupano di acquisire le lock necessarie.
 
-Per quanto riguarda la persistenza dei dati e l'aggiornamento dei portafogli entrano in gioco due metodi in particolare, `makePersistenceRunnable` e `makeWalletRunnable`, i quali permettodo di configurare e restituiscono dei `Runnable` che si occuperanno, rispettivamente, della persistenza e dei portafogli. Per semplicità i dati dell'intero social, portafogli compresi, vengono periodicamente memorizzati in un unico file, il cui path è configurabile nelle impostazioni del server, in formato JSON.
+A occuparsi della persistenza dei dati e dell'aggiornamento dei portafogli sono due metodi in particolare, `makePersistenceRunnable` e `makeWalletRunnable`, i quali permettodo di configurare e restituiscono dei `Runnable` che si occuperanno, rispettivamente, della persistenza e dei portafogli. Per semplicità i dati dell'intero social, portafogli compresi, vengono periodicamente memorizzati in un unico file, il cui path è configurabile nelle impostazioni del server, in formato JSON. Tali `Runnable` saranno eseguiti in thread dedicati dal server, unico utilizzatore della classe `Winsome`.
+
+&nbsp;
+
+### Il Server
+
+Esaminiamo più nel dettaglio componenti che contribuiscono al funzionamento del server.
+
+#### Server
+
+Come già anticipato, le richieste dei client e le relative risposte da inoltrare vengono gestite, a basso livello, utilizzando NIO e il multiplexing dei canali, per quando riguarda le feature richieste usufruibili tramite socket TCP. La classe `Server` ha principalmente tale compito, facendosi onere nella pratica della maggior parte delle comunicazioni da e verso i client.
+
+Per affrontare la gestione del parsing dell'header `Content-Length` è stato necessario introdurre delle strategie un pelo sofisticate in alcune occasioni. Dato che in entrata si ha un flusso di byte, suddiviso in chunk dal contenuto non determinato, tale header potrebbe comparire in qualunque momento. Si è fatto perno sull'individuare sequenza CR LF CR LF per permettere un parsing parziale della richiesta HTTP, in particolare degli header impostati, in modo tale da poter proseguire col ricevere la sua restante parte.
+
+Osserviamo che vi è un solo `ByteBuffer`, condiviso tra tutti i client, adibito alla lettura dei byte dai canali, il quale contenuto viene immediatamente trasferito in una struttura dati propria di ogni singolo client: una istanza della classe `RequestContext`. NIO gestisce le nuove connessioni in entrata, la lettura della richiesta e la scrittura della risposta in un solo thread; effettuato il parsing completo di una richiesta HTTP, essa viene data in gestione a `JExpress` che eseguirà le proprie operazioni in un thread pool dedicato, per poi restituire a NIO la risposta da inoltrare al client tramite una `CompletableFuture`. Il thread pool, definito _common pool instance_, viene inizializzato automaticamente dalla JVM all'avvio del programma, ed è utilizzato automaticamente per la gestione, ad esempio, degli stream paralleli, come anche per l'esecuzione di task asincrone.\
+Citando la documentazione:
+> A ForkJoinPool differs from other kinds of ExecutorService mainly by virtue of employing work-stealing: all threads in the pool attempt to find and execute tasks submitted to the pool and/or created by other active tasks (eventually blocking waiting for work if none exist). This enables efficient processing when most tasks spawn other subtasks (as do most ForkJoinTasks), as well as when many small tasks are submitted to the pool from external clients.
+> A static commonPool() is available and appropriate for most applications. The common pool is used by any ForkJoinTask that is not explicitly submitted to a specified pool. Using the common pool normally reduces resource usage (its threads are slowly reclaimed during periods of non-use, and reinstated upon subsequent use).
+
+#### RequestContext
+
+Le istanze di tale classe sono utilizzate come attachment ai canali gestiti da NIO. Internamente contiene buffer dedicati alla lettura delle richieste e al contenimento della risposta, oltre a vari flag e field vari utili a NIO durante la gestione del client corrispondente.
+
+#### ServerConfig
+
+Rappresenta il file JSON contenente le configurazioni del server.
+
+#### ServerMain
+
+Tale classe, eseguibile, si occupa di istanziare le varie classi viste fino ad ora, come ad esempio la classe `Server`, la classe `Winsome` e la classe `JExpress`. Si occupa delle varie configurazioni: RMI, TCP, UDP multicast, si occupa di recuperare lo stato del server memorizzato su disco e si occupa di avviare e gestire i thread principali: server, wallet e persistence. È suo compito impostare anche le rotte per le API "REST", gli handler e i middleware per le richieste.\
+La configurazione e l'inoltro della notifica in multicast dell'avvenuto aggiornamento del wallet sono piuttosto standard rispetto a quanto visto nel corso.
+
+Le rotte, con i relativi metodi, disponibili sono:
+
+- `GET /multicast`, permette ai client di recuperare le informazioni su indirizzo IP e porta da utilizzare per ricevere le notifiche di aggiornamento del wallet
+- `POST /login`, permette agli utenti di eseguire il login
+- `POST /login?force=true`, permette agli utenti di eseguire il login anche se risultano, dal punto di vista del server, già online; il token JWT verrà aggiornato e la sessione precedente risulterà invalida (utile nel caso in cui il client perda il token JWT o esso risulti scaduto)
+- `POST /logout`, permette ad un utente di disconnetersi
+- `POST /users`, permette ad un utente sconosciuto di registrarsi (utile per l'applicativo web frontend)
+- `GET /users`, permette ad un utente di ottenere la lista di altri utenti aventi almeno un tag in comune con esso
+- `GET /users/:user_id`: permette di ottenere informazioni su uno specifico utente
+- `GET /users/:user_id/followers`: permette di ottenere la lista di followers di `:user_id`
+- `GET /users/:user_id/following`: permette di ottenere la lista di utenti seguiti da `:user_id`
+- `POST /users/:user_id/following`: permette ad un utente di seguire `:user_id`
+- `DELETE /users/:user_id/following`: permette ad un utente di rimuoversi come follower di `:user_id`
+- `GET /users/:user_id/blog`: permette di ottenere il blog di `:user_id`
+- `GET /users/:user_id/feed`: permette di ottenere il feed di `:user_id`
+- `GET /users/:user_id/wallet`: permette di ottenere la history del wallet di `:user_id` in Wincoin
+- `GET /users/:user_id/wallet?currency=wincoin`: permette di ottenere la history del wallet di `:user_id` e il totale in Wincoin
+- `GET /users/:user_id/wallet?currency=bitcoin`: permette di ottenere la history del wallet di `:user_id` e il totale in Bitcoin
+- `POST /users/:user_id/posts`: permette di aggiungere un post al blog di `:user_id`
+- `POST /users/:user_id/posts?rewinPost=<post_id>`: permette di "rewinnare" il post `<post_id>` sul blog di `:user_id`
+- `DELETE /users/:user_id/posts/:post_id`: permette di eliminare il post `post_id` dal blog di `:user_id`
+- `GET /users/:user_id/posts/:post_id`: permette di visionare il post `post_id` del blog di `:user_id`
+- `GET /posts/:post_id`: permette di visionare il post `post_id`
+- `GET /posts/:post_id?author=true`: permette di visionare l'autore del post `post_id`
+- `POST /users/:user_id/posts/:post_id/reactions`: permette di aggiungere una reazione al post `:post_ id` del blog di `:user_id`
+- `POST /users/:user_id/posts/:post_id/comments`: permette di aggiungere un commento al post `:post_ id` del blog di `:user_id`
+- `OPTIONS /*`: permette di accettare tutte le preflight request, in collaborazione con un middleware dedicato
+
+Il middleware principale è il middleware che si occupa di gestire l'autenticazione e l'autorizzazione dell'utente, estraendo il token JWT dall'header Authorization (Bearer Authentication) per poi valutarne l'integrità e la scadenza. Dal token è possibile estrarre le generalità dell'utente che ha eseguito la richiesta. Tutte le rotte, tranne quelle dedicate al login e alla registrazione, sono sono sottoposte a tali controlli.
+
+#### IRemoteServer e RemoteServer
+
+La registrazione e l'ottenimento della lista dei followers, da effettuare tramite RMI, sono dispobili come richiesto. L'interfaccia e l'implementazione corrispondente non presentano, rispetto a quanto visto nel corso, dettagli particolarmente rilevanti. Le strutture utilizzante internamente sono strutture concorrenti; viene inoltre messa a disposizione la possibilità di impostare una lambda che sarà richiamata ogni volta che un client registra la propria callback per ottenere gli aggiornamenti sulla lista degli utenti. In questo modo è più agevole inoltrare al client appena connesso la lista attuale di utenti che lo seguono.

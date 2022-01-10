@@ -156,7 +156,7 @@ La classe è un semplice POJO che rappresenta una coppia guadagno, timestamp, e 
 
 ### Protocollo HTTP: richieste e risposte
 
-Il protocollo HTTP è un protocollo a livello applicativo usato principalmente come mezzo di interscambio di informazioni nel web, ed particolarmente adatto per le architetture client/server.
+Il protocollo HTTP è un protocollo a livello applicativo usato principalmente come mezzo di interscambio di informazioni nel web, ed particolarmente adatto per le architetture client-server.
 
 #### HttpRequest
 
@@ -320,7 +320,7 @@ Rappresenta il file JSON contenente le configurazioni del server.
 
 #### ServerMain
 
-Tale classe, eseguibile, si occupa di istanziare le varie classi viste fino ad ora, come ad esempio la classe `Server`, la classe `Winsome` e la classe `JExpress`. Si occupa delle varie configurazioni: RMI, TCP, UDP multicast, si occupa di recuperare lo stato del server memorizzato su disco e si occupa di avviare e gestire i thread principali: server, wallet e persistence. È suo compito impostare anche le rotte per le API "REST", gli handler e i middleware per le richieste.\
+Tale classe, eseguibile, si occupa di istanziare le principali classi viste fino ad ora, come ad esempio la classe `Server`, la classe `Winsome` e la classe `JExpress`. Si occupa delle varie configurazioni: RMI, TCP, UDP multicast, si occupa di recuperare lo stato del server memorizzato su disco e si occupa di avviare e gestire i thread principali: server, wallet e persistence. È suo compito impostare anche le rotte per le API "REST", gli handler e i middleware per le richieste.\
 La configurazione e l'inoltro della notifica in multicast dell'avvenuto aggiornamento del wallet sono piuttosto standard rispetto a quanto visto nel corso.
 
 Le rotte, con i relativi metodi, disponibili sono:
@@ -356,3 +356,89 @@ Il middleware principale è il middleware che si occupa di gestire l'autenticazi
 #### IRemoteServer e RemoteServer
 
 La registrazione e l'ottenimento della lista dei followers, da effettuare tramite RMI, sono dispobili come richiesto. L'interfaccia e l'implementazione corrispondente non presentano, rispetto a quanto visto nel corso, dettagli particolarmente rilevanti. Le strutture utilizzante internamente sono strutture concorrenti; viene inoltre messa a disposizione la possibilità di impostare una lambda che sarà richiamata ogni volta che un client registra la propria callback per ottenere gli aggiornamenti sulla lista degli utenti. In questo modo è più agevole inoltrare al client appena connesso la lista attuale di utenti che lo seguono.
+
+&nbsp;
+
+### La CLI
+
+#### ClientMain
+
+La classe `ClientMain`, eseguibile, si occupa della gestione della Command Line Interface richiesta. Comunica con il server principalmente attraverso una semplice socket TCP, al quale inoltra le richieste in base ai comandi inseriti dall'utente. I comandi disponibili sono:
+
+- `help: get help",
+- `register <username> <password> <tags>`: registra un nuovo utente
+- `login <username> <password> [-f]`: esegue il login, eventualmente forzando l'aggiornamento del token JWT
+- `logout`: esegue il logout dell'utente corrente
+- `list users`: lista gli utenti aventi almeno un tag in comune dell'utente corrente
+- `list followers`: lista i follower dell'utente corrente
+- `list following`: lista gli utenti seguiti dall'utente corrente
+- `follow <username>`: per seguire un altro utente
+- `unfollow <username>`: per smettere di seguire un altro utente
+- `blog`: lista i post creati dall'utente corrente
+- `post <title> <content>`: crea un nuovo post nel blog dell'utente corrente
+- `show feed`: mostra il feed dell'utente corrente
+- `show post <id>`: mostra uno specifico post
+- `delete <idPost>`: cancella uno specifico post
+- `rewin <idPost>`: esegui il rewin di uno specifico post
+- `rate <idPost> +1/-1`: aggiunge una reazione a uno specifico post
+- `comment <idPost> <comment>`: aggiunge un commento a uno specifico post
+- `wallet [btc]` mostra il portafogli dell'utente corrente
+- `whoami`: mostra l'utente corrente
+- `exit`: termina la CLI
+
+La CLI è composta da due thread principali, il primo per la gestione dei comandi dell'utente e il secondo per ricevere le notifiche multicast.\
+Inoltre, la CLI persiste il token dell'utente, in modo tale da allinearsi con il server che non considera un utente disconnesso finché non esegue esplicitamente il logout. Ciò potrebbe comunque portare a seri problemi nel caso in cui il token risulti corrotto, mancante o scaduto. Per questo il server mette a disposizione la possibilità di aggiornare il token JWT, forzando il login nel caso in cui l'utente risulti già connesso.
+
+#### ClientConfig
+
+Rappresenta il file JSON contenente le configurazioni del client.
+
+#### IRemoteClient e RemoteClient
+
+La registrazione e l'ottenimento della lista dei followers, da effettuare tramite RMI, sono dispobili come richiesto.\
+Anche nel caso del client, l'interfaccia e l'implementazione corrispondente non presentano, rispetto a quanto visto nel corso, dettagli particolarmente rilevanti. Le strutture utilizzante internamente sono strutture concorrenti.
+
+&nbsp;
+
+### Il client web
+
+È stato creato un client alternativo, un'applicazione web frontend, che, con alcune limitazioni, permette di eseguire le varie operazioni possibili attraverso la CLI. Si tratta di una Single Page Application basata sul framework Vue.js e il linguaggio TypeScript, un superset tipizzato del JavaScript.\
+Attraverso questa applicazione è possibile: registrarsi, "loggarsi", controllare il proprio feed, commentare e lasciare reazioni ai post oltre che "rewinnarli". È possibile anche visionare il proprio feed, creare nuovi post e controllare il proprio profilo: utenti seguiti, follower e i tag scelti durante la registrazione. È possibile trovare il codice sorgente dell'applicazione seguendo il link: [https://github.com/jfet97/winsome-app](https://github.com/jfet97/winsome-app).
+
+Seguono alcune schermate dell'applicazione:
+
+![](2022-01-10-21-12-20.png)
+
+![](2022-01-10-21-13-25.png)
+
+![](2022-01-10-21-16-38.png)
+
+![](2022-01-10-21-20-12.png)
+
+![](2022-01-10-21-20-53.png)
+
+![](2022-01-10-21-22-43.png)
+
+![](2022-01-10-21-23-00.png)
+
+&nbsp;
+
+### Serializzazione e deserializzazione
+
+La gestione della serializzazione e della deserializzazione delle strutture dati in e dal formato JSON è stata parzialmente affidata a __Jackson__.\ La maggior parte delle classi utilizzate provvede un metodo avente l'unico scopo di trasformare l'istanza in JSON valido, e quest'approccio manuale è stato preferito alla scrittura di custom serializer dedicati a Jackson per migliorare la velocità dell'esecuzione, evitando l'entrata in gioco della reflection. La deserializzazione è stata invece interamente lasciata a Jackson, sia nel client che nel server. Nel client si è fatto abbondantemente uso dei JSON pointer, principalmente per provare sul campo questa ulteriore feature della libreria.
+
+Nota dolente la serializzazione dello stato dell'intero server, che per ragioni di semplicità e di tempo non è particolarmente efficiente, specialmente dal punto di vista della memoria, poiché non si fa uso della Jackson Streaming API.
+
+&nbsp;
+
+### Test
+
+&nbsp;
+
+### Librerie usate
+
+&nbsp;
+
+### Repository GitHub del progetto
+
+&nbsp;

@@ -64,16 +64,16 @@ La modellazione degli errori non è però l'unico scopo per cui esiste l'`Either
 
 Il tipo `Validation` ha delle similarità con il tipo `Either`, ma non possiede lo stesso potere dal punto di vista della composizione. Il prezzo si paga in favore di una necessità profondamente diversa per quanto riguarda il caso di errore, ovvero la possibilità di eseguire comunque delle computazioni, possibilmente in parallelo, nonostante alcune possano fallire, in modo da poter raccogliere il numero più elevato di errori possibile. Il nome di questo tipo è emblematico, infatti esso è spesso utilizzato per modellare controlli di validità su strutture aventi dipendenze esterne, come ad esempio istanze derivanti dalla deserializzazione del JSON ottenuto in base all'input inserito da un operatore umano in un form.
 
-Per poter combinare tra loro i possibili errori durante l'esecuzione delle computazioni, poiché essi potrebbero avere un qualunque tipo `E`, purché sia il medesimo tra tutti essi, la strategia più comune consiste nella loro raccolta in una qualche sequenza, come ad esempio una lista o un array, posticipando completamente la loro gestione. Se infatti è piuttosto chiaro come due istanze di `String` possano essere combinate, lo è molto meno nel caso di due `RuntimeException`. In generale spetterà quindi al client della validazione la decisione sul da farsi coi possibili errori incontrati. Questa tecnica ha un nome preciso per gli adetti ai lavori, si tratta di sfruttare il monoide libero su `E`.
+Per poter combinare tra loro i possibili errori durante l'esecuzione delle computazioni, poiché essi potrebbero avere un qualunque tipo `E`, purché sia il medesimo tra tutti essi, la strategia più comune consiste nella loro raccolta in una qualche sequenza, come ad esempio una lista o un array, posticipando completamente la loro gestione. Se infatti è piuttosto chiaro come due istanze di `String` possano essere combinate, lo è molto meno nel caso di due `RuntimeException`. In generale spetterà quindi al client della validazione la decisione sul da farsi coi possibili errori incontrati. Questa tecnica ha un nome preciso nella programmazione funzionale: si tratta di utilizzare il monoide libero su `E`.
 
 #### JWT
 
 Passando dalla teoria alla pratica, vediamo brevemente cosa sono i JSON web token e come possono essere utilizzati al meglio per verificare l'identità di un utente.
 
-La documentazione, raggiungibile seguendo il link [https://jwt.io/introduction](https://jwt.io/introduction), introduce i JWT nel seguente modo:
+La documentazione, raggiungibile seguendo il link [https://jwt.io/introduction](https://jwt.io/introduction), introduce i token JWT nel seguente modo:
 > JSON Web Token (JWT) is an open standard (RFC 7519) that defines a compact and self-contained way for securely transmitting information between parties as a JSON object. This information can be verified and trusted because it is digitally signed. JWTs can be signed using a secret (with the HMAC algorithm) or a public/private key pair using RSA or ECDSA.
 
-Un JWT è codificato utilizzando il formato __Base64url__ ed solitamente costruito da tre componenti: un header, un  payload e la signature:
+I token JWT sono lo standard de facto per quanto riguarda l'autorizzazione e l'autenticazione stateless degli utenti nei servizi web moderni. Un token JWT è codificato utilizzando il formato __Base64url__ ed solitamente costruito da tre componenti: un header, un  payload e la signature:
 
 ```java
 xxxxx.yyyyy.zzzzz
@@ -97,7 +97,7 @@ La classe `Comment` rappresenta i commenti che gli utenti possono aggiungere ai 
 
 #### Feedback
 
-La classe `Feedback` viene utilizzata ovunque il server ritenga opportuno inserire nella risposta HTTP un body, ovviamente in formato JSON. Un feedback è un wrapper contentente un generico dato:
+La classe `Feedback` viene utilizzata ovunque il server ritenga opportuno inserire nella risposta HTTP un body, ovviamente in formato JSON. Un feedback è un wrapper contenente un generico dato:
 
 ```ts
 {
@@ -150,7 +150,9 @@ Valgono le considerazioni sulla eventual consistence fatte in precedenza per alt
 
 #### WalletTransaction
 
-La classe è un semplice POJO che rappresenta una coppia guadagno, timestamp, e concorre a formare la history del portafoglio di un utente.\ È presente una `WalletTransactionFactory` per la creazione sicura basata su validazioni, dove necessario, di istanze di tipo `WalletTransaction`.
+La classe è un semplice POJO che rappresenta una coppia guadagno, timestamp, e concorre a formare la history del portafoglio di un utente.
+
+È presente una `WalletTransactionFactory` per la creazione sicura basata su validazioni, dove necessario, di istanze di tipo `WalletTransaction`.
 
 &nbsp;
 
@@ -301,7 +303,7 @@ Esaminiamo più nel dettaglio componenti che contribuiscono al funzionamento del
 
 #### Server
 
-Come già anticipato, le richieste dei client e le relative risposte da inoltrare vengono gestite, a basso livello, utilizzando NIO e il multiplexing dei canali, per quando riguarda le feature richieste usufruibili tramite socket TCP. La classe `Server` ha principalmente tale compito, facendosi onere nella pratica della maggior parte delle comunicazioni da e verso i client.
+Come già anticipato, le richieste dei client e le relative risposte da inoltrare vengono gestite, a basso livello, utilizzando NIO e il multiplexing dei canali, per quando riguarda le feature richieste usufruibili tramite socket TCP. La classe `Server` ha principalmente tale compito, facendosi onere nella pratica della maggior parte delle comunicazioni da e verso i client. Le caratteristiche non bloccanti di NIO sono sicuramente le più adeguate per affrontare la realistica necessità di dover gestire più client contemporaneamente.
 
 Per affrontare la gestione del parsing dell'header `Content-Length` è stato necessario introdurre delle strategie un pelo sofisticate in alcune occasioni. Dato che in entrata si ha un flusso di byte, suddiviso in chunk dal contenuto non determinato, tale header potrebbe comparire in qualunque momento. Si è fatto perno sull'individuare sequenza CR LF CR LF per permettere un parsing parziale della richiesta HTTP, in particolare degli header impostati, in modo tale da poter proseguire col ricevere la sua restante parte.
 

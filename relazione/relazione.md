@@ -289,7 +289,7 @@ Una precisazione importante. In varie parti del codice sono presenti istruzioni,
 Per quanto riguarda il primo caso la risposta è sempre affermativa, in quanto l'iterazione sull'entry set di una struttura concorrente è priva del rischio di incorrere nella spiacevole `ConcurrentModificationException`, al prezzo del rischio di non incontrare eventuali elementi aggiunti alla struttura dopo l'inizio dell'iterazione.\
 Nel caso di strutture non concorrenti, la questione è leggermente più delicata. Ottenere uno stream, come già accennato, è una operazione che ha molto in comune con il processo di iterazione messo a disposizione dal linguaggio. Se tale struttura venisse modificata durante l'uso dello stream, si potrebbero incontrare spiacevoli conseguenze. Ecco perché la strategia adottata, specialmente evidente nelle classi `User` e `Post`, è quella di restituire una shallow copy della struttura dati creata in mutua esclusione. Tale copia non rifletterà eventuali modifiche apportate alla struttura dati originale, ma potrà essere iterata in totale sicurezza.
 
-Per quanto riguarda i dati contenuti all'interno di tali strutture, varie sono le situazioni nelle quali si può incorrere. L'accesso concorrente a dati che sappiamo essere di sola lettura può avvenire senza alcun tipo di problema, mentre in altri casi si è reso necessario acquisire delle lock più granulari. Fuori dalla classe Winsome l'operazione principale che viene effettuata su tali contenuti è la trasformazione in formato JSON; tale trasformazione si basa su due metodi esposti dalle classi in gioco che si preoccupano di acquisire le lock necessarie.
+Per quanto riguarda i dati contenuti all'interno di tali strutture, varie sono le situazioni nelle quali si può incorrere. L'accesso concorrente a dati che sappiamo essere di sola lettura può avvenire senza alcun tipo di problema, mentre in altri casi si è reso necessario acquisire delle lock più granulari. Fuori dalla classe Winsome l'operazione principale che viene effettuata su tali contenuti è la trasformazione in formato JSON; tale trasformazione si basa su dei metodi esposti dalle classi in gioco che si preoccupano di acquisire le lock necessarie.
 
 A occuparsi della persistenza dei dati e dell'aggiornamento dei portafogli sono due metodi in particolare, `makePersistenceRunnable` e `makeWalletRunnable`, i quali permettodo di configurare e restituiscono dei `Runnable` che si occuperanno, rispettivamente, della persistenza e dei portafogli. Per semplicità i dati dell'intero social, portafogli compresi, vengono periodicamente memorizzati in un unico file, il cui path è configurabile nelle impostazioni del server, in formato JSON. Tali `Runnable` saranno eseguiti in thread dedicati dal server, unico utilizzatore della classe `Winsome`.
 
@@ -316,7 +316,7 @@ Le istanze di tale classe sono utilizzate come attachment ai canali gestiti da N
 
 #### ServerConfig
 
-Rappresenta il file JSON contenente le configurazioni del server.
+Rappresenta il file JSON contenente le configurazioni del server. Gli intervalli di tempo configurabili si intendono espressi in millisecondi.
 
 #### ServerMain
 
@@ -391,7 +391,7 @@ Inoltre, la CLI persiste il token dell'utente, in modo tale da allinearsi con il
 
 #### ClientConfig
 
-Rappresenta il file JSON contenente le configurazioni del client.
+Rappresenta il file JSON contenente le configurazioni del client. Gli intervalli di tempo configurabili si intendono espressi in millisecondi.
 
 #### IRemoteClient e RemoteClient
 
@@ -403,29 +403,30 @@ Anche nel caso del client, l'interfaccia e l'implementazione corrispondente non 
 ### Il client web
 
 È stato creato un client alternativo, un'applicazione web frontend, che, con alcune limitazioni, permette di eseguire le varie operazioni possibili attraverso la CLI. Si tratta di una Single Page Application basata sul framework Vue.js e il linguaggio TypeScript, un superset tipizzato del JavaScript.\
-Attraverso questa applicazione è possibile: registrarsi, "loggarsi", controllare il proprio feed, commentare e lasciare reazioni ai post oltre che "rewinnarli". È possibile anche visionare il proprio feed, creare nuovi post e controllare il proprio profilo: utenti seguiti, follower e i tag scelti durante la registrazione. È possibile trovare il codice sorgente dell'applicazione seguendo il link: [https://github.com/jfet97/winsome-app](https://github.com/jfet97/winsome-app).
+Attraverso questa applicazione è possibile: registrarsi, "loggarsi", controllare il proprio feed, commentare e lasciare reazioni ai post oltre che "rewinnarli". È possibile anche visionare il proprio feed, creare nuovi post e controllare il proprio profilo: utenti seguiti, follower e i tag scelti durante la registrazione.
 
 Seguono alcune schermate dell'applicazione:
 
-![](2022-01-10-21-12-20.png)
+![login](2022-01-10-21-12-20.png)
 
-![](2022-01-10-21-13-25.png)
+![register](2022-01-10-21-13-25.png)
 
-![](2022-01-10-21-16-38.png)
+![profile](2022-01-10-21-16-38.png)
 
-![](2022-01-10-21-20-12.png)
+![feed](2022-01-10-21-20-12.png)
 
-![](2022-01-10-21-20-53.png)
+![comment](2022-01-10-21-20-53.png)
 
-![](2022-01-10-21-22-43.png)
+![post](2022-01-10-21-22-43.png)
 
-![](2022-01-10-21-23-00.png)
+![blog](2022-01-10-21-23-00.png)
 
 &nbsp;
 
 ### Serializzazione e deserializzazione
 
-La gestione della serializzazione e della deserializzazione delle strutture dati in e dal formato JSON è stata parzialmente affidata a __Jackson__.\ La maggior parte delle classi utilizzate provvede un metodo avente l'unico scopo di trasformare l'istanza in JSON valido, e quest'approccio manuale è stato preferito alla scrittura di custom serializer dedicati a Jackson per migliorare la velocità dell'esecuzione, evitando l'entrata in gioco della reflection. La deserializzazione è stata invece interamente lasciata a Jackson, sia nel client che nel server. Nel client si è fatto abbondantemente uso dei JSON pointer, principalmente per provare sul campo questa ulteriore feature della libreria.
+La gestione della serializzazione e della deserializzazione delle strutture dati in e dal formato JSON è stata parzialmente affidata a __Jackson__.\
+La maggior parte delle classi utilizzate provvede un metodo avente l'unico scopo di trasformare l'istanza in JSON valido, e quest'approccio manuale è stato preferito alla scrittura di custom serializer dedicati a Jackson per migliorare la velocità dell'esecuzione, evitando l'entrata in gioco della reflection. La deserializzazione è stata invece interamente lasciata a Jackson, sia nel client che nel server. Nel client si è fatto abbondantemente uso dei JSON pointer, principalmente per provare sul campo questa ulteriore feature della libreria.
 
 Nota dolente la serializzazione dello stato dell'intero server, che per ragioni di semplicità e di tempo non è particolarmente efficiente, specialmente dal punto di vista della memoria, poiché non si fa uso della Jackson Streaming API.
 
@@ -433,12 +434,58 @@ Nota dolente la serializzazione dello stato dell'intero server, che per ragioni 
 
 ### Test
 
+È stato sperimentato l'utilizzo di __JUnit__ per la creazione di alcune suite di unit test, locate nelle cartelle `tests` presenti nei vari moduli. Lungi dall'essere esaustive o esempio di corretto approccio, tali suite sono state occasione per provare alcune tra le possibilità offerte dal linguaggio Java per quanto riguarda il testing del codice.
+
 &nbsp;
 
 ### Librerie usate
 
+Segue un elenco delle librerie di terze parti utilizzate nel progetto:
+
+- `jackson`: fornisce le primitive necessarie all'utilizzo del JSON come formato per l'interscambio dei dati
+- `java-jwt`: fornisce le primitive necessarie per l'emissione, la firma, la validazione e la codifica dei token JWT
+- `junit`: fornisce le primitive necessarie al testing del codice
+- `vavr`: fornisce i tipi `Either` e `Validation`
+
+&nbsp;
+
+### Compilazione ed esecuzione
+
+Per compilare il progetto è sufficiente eseguire lo script bash `compile.sh`, tenendo presente che è stata utilizzata la versione 11 del linguaggio:
+
+```sh
+bash compile.sh
+```
+
+Dopo aver compilato, è possibile avviare il server tramite lo script `server.sh` passando come argomento il path del file JSON contenente la configurazione:
+
+```sh
+bash server.sh ./config/serverConfig.json
+```
+
+A questo punto può essere avviato il client tramite lo script `client.sh` passando come argomento il path del file JSON contenente la configurazione:
+
+```sh
+bash client.sh ./config/clientConfig.json
+```
+
+Gli script sono stati creati grazie alle indicazioni fornite da [https://twin.sh/articles/8/how-to-compile-large-java-projects-from-terminal](https://twin.sh/articles/8/how-to-compile-large-java-projects-from-terminal).
+
+&nbsp;
+Sono stati forniti i jar sia del client che del server, eseguibili nel seguente modo:
+
+```sh
+java -jar ./jars/Server.jar ./config/serverConfig.json
+
+java -jar ./jars/Client.jar ./config/clientConfig.json
+```
+
 &nbsp;
 
 ### Repository GitHub del progetto
+
+Il codice sorgente dell'intero progetto è liberamente fruibile su GitHub: [https://github.com/jfet97/winsome](https://github.com/jfet97/winsome).
+
+Il link per accedere al codice sorgente dell'applicazione web è il seguente: [https://github.com/jfet97/winsome-app](https://github.com/jfet97/winsome-app).
 
 &nbsp;
